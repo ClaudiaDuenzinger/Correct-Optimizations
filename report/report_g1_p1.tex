@@ -55,6 +55,7 @@
  
  \documentclass[letterpaper,twocolumn,10pt]{article}
  \usepackage{usenix}
+ \usepackage[numbers]{natbib}
  
  % to be able to draw some self-contained figs
  \usepackage{tikz}
@@ -98,7 +99,7 @@
  	%-------------------------------------------------------------------------------
  	\section{Introduction}
  	%-------------------------------------------------------------------------------
- 	This report aims to analyze and propose opportunities to continue the research from Liu et al.~\cite{liu24:minotaur}.
+ 	This report aims to analyze and propose opportunities to continue the research from~\citeauthor{liu24:minotaur}~\cite{liu24:minotaur}.
  	
 
  	%-------------------------------------------------------------------------------
@@ -107,33 +108,56 @@
  	\subsection{Context}
  	%1. Context of the work (“Why”?)
  	%What is the problem? 
- 	Minotaur is a superoptimizing compiler that identifies missed optimization opportunities in the LLVM compiler during a search of the program space. Its synthesizer creates improved machine code by using program synthesis, generating and comparing equivalent but cheaper instruction sequences. To guarantee correctness of the optimization, Alive2 was extended to formally verify the generated code. Additionally, to reduce computation overhead, Minotaur also caches discovered transformations for reuse in future compilations.
+ 	Minotaur is a superoptimizer that identifies missed optimization opportunities by the LLVM compiler by slicing generated IR and trying to synthesize new faster code.
+	Its synthesizer creates improved machine code, generating and comparing equivalent but cheaper instruction sequences.
+	To guarantee correctness of the optimization, Alive2 was extended to formally verify the generated code.
+	Additionally, to reduce computation overhead, Minotaur also caches discovered transformations for reuse in future compilations.
  	
  	%Why is it important or interesting? 
- 	The use case of Minotaus lays in compilers that are already heavily optimized but still produce suboptimal code, particularly in SIMD operations. The authors demonstrated that with LLVM's advanced autovectorizer output that produced redundant or inefficient SIMD instructions. In those missed opportunities, Minotaur corrects these suboptimal instruction sequences either by inserting improved machine code during the compilation or by suggesting the optimizations directly for the LLVM. Hence, the authors enabled higher performing and additionally formally verified machine code without hindering the compilers performance itself.
+ 	The use case of Minotaur is to further optimize already heavily optimized code from a compiler which still often contain suboptimal code segments, particularly for SIMD operations.
+	The authors showed that even LLVM's advanced autovectorizer produced redundant or inefficient SIMD instructions.
+	For those missed opportunities, Minotaur can correct these suboptimal instruction sequences by replacing them with improved machine code during the compilation.
+	Some of those could be generalized and added to LLVM.
+	Hence, the authors enabled higher performing and additionally formally verified machine code generation through the use of Minotaur.
  	
  	%What is the state-of-the-art? What is the “research gap”? 
- 	Before Minotaur, several superoptimizer already existed that search through the program code for more efficient sequences instead of performing set transformations like traditional compilers. Common examples include Souper -- with focus on scalar integer optimizations and is now integrated in the LLVM -- and STOKE, which uses stochastic search for faster x86 code blocks. However, those tools only addressed part of the problem. Souper detects only improvements for integer operations, but not for floating-point or SIMD instructions. STOKE's improvements include complex optimizations, but the tool relies on randomized testing and not formal verifications for its transformations. Therefore, the combined challenge of performing complex vector or floating point optimizations, formally verifying the transformation and integrating those capabilities into production compilers remained unsolved, until Minotaur. 
+ 	Before Minotaur, several superoptimizer already existed that search through the code, be it assembly or LLVM IR, for more efficient sequences instead of performing set rewriting rules like traditional compilers.
+	Common examples include Souper -- with focus on scalar integer optimizations and which also uses LLVM IR -- and STOKE, which uses stochastic search for faster x86 code blocks.
+	However, those tools only addressed part of the problem.
+	Souper~\cite{DBLP:souper} detects only improvements for integer operations, but not for floating-point or SIMD instructions.
+	STOKE's~\cite{DBLP:stoke} improvements include complex optimizations, but the tool relies on randomized testing and not formal verifications for its transformations. % I think this changed in 2019 with https://doi.org/10.1145/3314221.3314601
+	Therefore, the combined challenge of performing complex vector or floating point optimizations, formally verifying the transformation and integrating those capabilities into production compilers remained unsolved, until Minotaur. 
  	
  	%Why is it difficult? Or what are the challenges?
- 	Designing a efficient and high performing superoptimizer included several challenges. First, the search space of replacement options for a suboptimal code sequence is enormous, making an exhaustive search for the optimal choice computationally expensive. Second, the semantic formal and not random equivalency check adds further overhead -- especially for hard to verify SIMD and floating point operations. Minotaur relies on SMT solvers for the code improvement checks, but these solvers often struggle with large complex expressions. At the same time a sufficient large number of lines of code is needed to provide enough context for determining improvement options in the first case. Furthermore, since Minotaur aims for low level, hardware aware optimizations, the authors required detailed information about pipelines and cache effects to accurately model the performance of the superoptimizor. These difficulties of realizing high performance without high computation overhead, required a multiple stages process. 
+ 	Designing a efficient and high performing superoptimizer included several challenges.
+	First, the search space of replacement options for a suboptimal code sequence is enormous, making an exhaustive search for the optimal choice computationally expensive.
+	Second, the semantic formal and not random equivalency check adds further overhead -- especially for hard to verify SIMD and floating point operations.
+	Minotaur relies on SMT solvers for equivalency checks between the original code and the proposed optimization, but these solvers often struggle with large complex expressions.
+	At the same time a sufficiently large number of lines of code is needed to provide enough context to be able to find improvement options in the first place.
+	Furthermore, since Minotaur aims for low level, hardware aware optimizations, the authors used detailed information about pipelines and cache effects to accurately model the performance of optimizations.
+	These difficulties of realizing high performance without too much computational cost, required a multiple stages process. 
  	
  	\subsection{Contributions}
  	%2. Contributions of the work (“How”?)
  	%What is the proposed solution? 
  	%How it works at a high-level?
  	%At high level, the authors decomposed the optimization process into three main stages. 
- 	Because today's SMT solvers cannot optimize entire LLVM functions, Minotaur instead optimizes each instruction individually. It therefore breaks the LLVM function in SSA form down into cuts, which are small a loop-free subsets of the the instruction's dependencies, to capture where the values used in the instruction come from. The size of the cut hereby influences the optimization, as too small cuts contain not enough context to determine a better code sequence, while too large cuts increase the solvers computation time. Through an empirical study the authors selected the cut size of four as it provides a good balance. For each cut, the SMT solver searches for a semantically equivalent but more efficient instruction sequence. These improvements are then verified with Alive2, which the authors extended to support SIMD and floating point operations. Lastly, for each optimization its speedup is estimated and its original and transformed code cached for reuse in future compilations. 
+ 	Because today's SMT solvers cannot optimize entire LLVM functions, Minotaur instead optimizes each instruction individually.
+	It therefore breaks the LLVM function in SSA form down into cuts, which are small loop-free subsets of the the instruction's dependencies, to capture where the values used in the instruction come from.
+	The size of the cut hereby influences the optimization, as too small cuts contain not enough context to determine a better code sequence, while too large cuts increase the solvers computation time dramatically.
+	Through an empirical study the authors selected the cut size of four as it provides a good balance between finding most optimization while still running in a acceptable amount of time.
+	For each cut, a set of potential alternatives which are faster are synthesized.
+	These improvements are then verified with Alive2, which the authors extended to support SIMD operations.
+	Lastly, for each optimization its speedup is estimated using a more accurate model (LLVM MCA) and its original and transformed code cached for reuse in future compilations. 
  	
 
  	%What are the key insights? 
  	%Or what are the novel aspects? 
- 	To measure how Minotaur's optimizations influence the overall compilations performance, the authors benchmarked Minotaur on the SPEC CPU 2017, GMP and libYUV on intel and amd hardware with LLVM 18 compiled at -03. They determined a maximum speedup of 1 - 7 percent, where SIMD fragments made out 75 percent of the performance gains. When the compilation is performed with an empty cache, Minotaur increased the runtime significantly. With a filled cache, however, only an additional 3 percent of computation time was needed. Overall, the authors determined 15 simple and general floating-point and vector optimizations, which they then reported the original LLVM.
- 	
- 	
- 	
- 	
- 	
+ 	To measure how Minotaur's optimizations influence the overall performance of larger software projects, the authors benchmarked Minotaur on the SPEC CPU 2017, GMP and libYUV on Intel and AMD hardware with LLVM 18 compiled with -O3 and -march=native.
+	They determined a maximum speedup of 1 - 7 percent, where integer SIMD fragments made out 75 percent of the discovered rewrites.
+	When the compilation is performed with an empty cache, Minotaur increased compile times significantly.
+	With a filled cache, however, only an additional 3 percent of computation time was needed.
+	Overall, the authors determined 15 simple and general floating-point and vector optimizations, which they then reported the LLVM project.
 
  	
  	%-------------------------------------------------------------------------------
@@ -162,7 +186,7 @@
  	TODO
  	
  	%-------------------------------------------------------------------------------
- 	\bibliographystyle{plain}
+ 	\bibliographystyle{plainnat}
  	\bibliography{report_g1_p1}
  	
  	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
