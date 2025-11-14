@@ -167,43 +167,65 @@
 
 	First, it has to be mentioned that the paper did not provide a exact git commit hash for the minotaur version that was used by the authors to run their benchmarks.
 	Since we could not determine which version was used it was decided to evaluate the most up to date version of minotaur\footnote{\url{https://github.com/KiSchulz/minotaur/tree/8ae5395286ba40fa29c16a0229fd3d6e9795d4cd}}.
-	One important difference between the most recent version and the version referenced by the authors in the paper is that the version in the paper used LLVM 18 whereas the newest version uses LLVM 20.
+	One important difference between the most recent version and the version referenced by the authors in the paper is that the version in the paper relied on LLVM 18 whereas the newest version uses LLVM 20.
 
 	Second, the most up to date version of minotaur, as of writing, does not work out of the box.
 	For it to not immediately crash on startup, the order in which the libraries are linked by minotaur had to be changed.
 	This changes the order in which the offending dynamic libraries are loaded when the program is started and thereby fixing the issue of undefined symbols.
 
 	Third, minotaur uses alive2's LLVM interpreter which is listed as highly experimental \footnote{\url{https://github.com/AliveToolkit/alive2/tree/master?tab=readme-ov-file\#running-the-standalone-llvm-execution-tool-alive-exec}} and caused multiple crashes.
-	Some of which where not reliably reproducible and could therefore not be debugged but since they did not appear reliably.
+	Some of which where not reliably reproducible and could therefore not be debugged.
 	In order to mitigate this, the compiler was run multiple times or problematic source files were filtered.
 	More about that when the setup for libyuv is discussed.
 	Some other bugs could be fixed.
 
-	Fourth, the caching of minotaur seems to not fully work in the last release.
-	Minotaur produces keys which are cached but it fails to retrieve those in subsequent compiles.
-	Nevertheless it produces different binaries than running LLVM without the minotaur plugin. % TODO: check if this is actually true
+	Fourth, the caching of minotaur seems to not fully work in the last release, as compiling a source file multiple consecutive times still leads to cache misses.
+	This might be caused differing inputs from LLVM's side.
+	Nevertheless it produces different binaries than running LLVM without the minotaur plugin.
 
 	After those issues were addressed, as far as possible, a run could be attempted.
 	Everything was compiled with the -O3 and -march=native flags as described in the paper.
-	We benchmarked libgmp-6.2.1, as the paper did, and a fitting version of libyuv which is able to build with LLVM 20.
-	All runs were performed with the same parameters as the paper described i.e. a depth bound of 4, total synthesizes time of 5 minutes and a 1 minute timeout for individual Z3 queries.
+	We benchmarked libgmp-6.2.1, as the paper did, and a fitting version of libyuv, which is able to build with LLVM 20.
+	All runs were performed with the same parameters as the paper described i.e. a depth bound of 4, total synthesizes time of 5 minutes and a 1 minute timeout for individual smt queries.
+	The benchmarks were build and run on an AMD Ryzen 9 5900X whereas the authors used an AMD Ryzen 9 5950X.
+	The former has 12 cores running at up to 4.8 GHz whereas the latter has 16 cores running at up to 4.9 GHz.
 
 
-	libgmp: The benchmark was build and run on an AMD Ryzen 9 5900X whereas the authors used an AMD Ryzen 9 5950X. The former has 12 cores running at up to 4.8 GHz whereas the latter has 16 cores running at up to 4.9 GHz.
+	libgmp:
 	According to the paper the build with an empty cache took 440 minutes for libgmp.
 	Our build took approximately 1020 minutes while using a partly dirty cache from previous attempts.
-	This could be caused by the authors using the offline mode of minotaur which we intentionally did not use since it caused even longer compile times due to the cache seemingly not working properly.
+	It seems unlikely that the difference in build times are caused by the hardware.
+	This difference in compile time could be caused by the authors using the offline mode of minotaur which we intentionally did not use since as discussed earlier the cache did not work as expected.
 
 	After finishing the build of libgmp the provided tests were run.
 	When building with vanilla LLVM all tests passed without any issue.
-	But when using minotaur at least two tests failed namely t-root and t-perfpow.
+	In contrast, using minotaur at least two tests failed namely t-root and t-perfpow.
 	This indicates some correctness bug in alive2 or in how minotaur uses alive2.
+	Later more of that is discussed.
 
-	When ignoring the failing tests and the other issues we could not see any speedup provided by minotuar \ref{our_libgmp}.
+	Ignoring the failing tests and the other issues, we could not see any speedup when running the benchmark using minotaur \ref{our_libgmp}.
 	There could be multiple reasons for this.
-	One could be that one of the previous issues which were not able to solve yet caused this or that most of the optimization found by minotaur in LLVM 18 are now already present in LLVM 20.
-	The high variance in the data could either stem from minotaurs optimizations or be caused by the system.
-	Nevertheless the overall results did not change significantly between runs.
+	One could be that any of the previous issues which we were not able to solve yet caused this.
+	Or, alternatively that most of the relevant optimization found by minotaur in LLVM 18 are now already present in LLVM 20.
+	This is not entirely implausible since the authors were able to get some of the found optimizations merged into LLVM.
+	The high variance between the single benchmarks could either stem from minotaur optimizations or be caused by the system executing the benchmark.
+	Nevertheless the overall results did not change significantly between the benchmark runs.
+
+	libyuv:
+	In order to be able to even build libyuv and to not run into constant crashes during the compilation phase, its third party dependencies were compiled without minotaur.
+	This would probably not have influenced the results to much since those dependencies seemed to be used mainly for auxiliary functionality.
+	Due to us not compiling the third party dependencies comparing compile times makes little sense since the authors seemed to compile all sources using minotaur judging by their compile time.
+	But in the end we were not able to run the benchmark suite of libyuv, which doubles as its test suite, since it was failing the tests using minotaur.
+	Similar to the results for libgmp the vanilla LLVM build passed the tests with no issues.
+
+	These results prompted us to investigate further.
+	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in the paper.
+
+	% TODO: Thomas part about that
+
+	After those failed as well we decided to write our own very simple program to provoke errors.
+
+	% TODO
 
 	\begin{figure*}[t]
 		\centering
@@ -220,7 +242,30 @@
 
 	Make the caching work
 
-	Dynamic cutting depth depending on benchmark data i.e. sampling profiler (profile guided optimization).
+	\subsection{Dynamic Cutting Depth using Profile Guided Optimization}
+	%Dynamic cutting depth depending on benchmark data i.e. sampling profiler (profile guided optimization).
+
+	% What is the problem: long compile times
+	% Why is it important: compiles already for hours for small projects which usually take seconds to build.
+	One major down side of minotaur at the moment is its long compile times.
+	Even for small projects, which usually compile within seconds, it can take thousands of times longer, making it hours or even days.
+	Improving on compile time could enable a more practical use of minotaur.
+	% Why is it difficult or what are the challenges: There are multiple ways to go about this either improve the proving speed, improve function synthesis, finding a dynamic depth bound as suggested by the paper
+	The main challenge is how to save on time while compiling and to not lose the benefits of minotaur i.e. runtime performance improvements.
+
+	% What is the proposed idea: using perf to find hot code sections and spend time on the most importent parts
+	% How will it work: first build the project with llvm, second run a benchmark with perf, third build it again with perf data and minotaur which then dynamically determines the depth bound
+	To achieve this one could try, as the paper suggested, to dynamically set the cutting depth.
+	Determining the cutting depth for each cut is hard since one would have to know how important a pice of code is to the overall runtime performance.
+	One simple way of doing this would be to first build the given code without minotaur and then benchmark it while gathering data with a profiler.
+	This profiling data could then be used in a second compilation of the code using minotaur to determine the cutting depth in minotaur dynamically during compilation.
+	In theory two goals could be achieved, namely reducing total compile time, by not spending time on unimportant code like code that is only ever executed once, and second, it could also enable minotaur to spend more time on important code which actually impacts performance.
+	% How would you measure and evaluate the idea: measure compile time and runtime between minotaur without perf data and with perf data
+	Changes in compile time between the papers version of minotaur and the augmented version would be the first important metric.
+	But this is obviously not enough, one also has to measure the runtime in order to determine if the proposal delivered any benefits.
+	% What would be the potential impact: faster compile times while having similar or better runtime performance
+	Ideally the suggestion would improve compile times by not optimizing non critical code while keeping or maybe improving runtime of the code.
+
 
 	try to optimize how minotaur and alive and z3 interact
 
