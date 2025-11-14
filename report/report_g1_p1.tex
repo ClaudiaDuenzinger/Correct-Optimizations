@@ -231,7 +231,24 @@
 	add fast math support
 
 	multi pass the superoptimizer 	
- 	
+
+	\subsection{Arm Support}
+	Currently minotaur only supports x86 architectures. While it contains a large amount of x86, intrinsics it uses LLVM IR which is platform-agnostic.
+	When considering ARM LLVM support for NEON is more robust and more similar to x86 used in minotaur.
+	Adding ARM support would entail implementing ca. 100 intrinsics (the x86 version of minotaur uses ~ 165), of which many are type duplicates, i.e. 32 bit and 64 bit variants.
+	While this seems feasible, it would also require modifying the register allocator and verifying the formal verification in alive2 to support ARM specific instructions.
+	Furthermore, optimizations found on x86 might not be applicable to ARM and vice versa, so a new cost model would be needed.
+	As a result this seems to be a significant engineering effort, which also requires advanced ARM benchmarking to determine which operations
+	are faster on ARM hardware.
+
+	\subsection{Developer Tools}
+	Currently minotaur is largely a black box. While you can log the transformations via cache-dump of the redis cache, this is no very user-friendly format.
+	An improvement would be better introspection tools to enhance minotaur as a research tool specifically. 
+	The cache can be made queryable and interactive via a web interface. Instead of raw LLVM IR one could display the rules used in the synthesis.
+	This goes hand in hand with statistics gathering about which cuts produce the most optimizations, which optimizations are most common and which optimizations produce the highest speedup
+	in the benchmarks. For example Graphviz could be used to visualize the cuts and their optimizations and a snippet view could show code before and after optimizations.
+
+
  	% %-------------------------------------------------------------------------------
  	% \section*{Acknowledgments}
  	% %-------------------------------------------------------------------------------
