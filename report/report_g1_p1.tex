@@ -219,13 +219,13 @@
 	Similar to the results for libgmp the vanilla LLVM build passed the tests with no issues.
 
 	These results prompted us to investigate further.
-	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in the paper.
+	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in the paper. Since the original C source code is not provided, we attempted to optimize the IR directly. However, we observed through different experiments that starting from LLVM IR rather than from the C code often leads to different optimization results, which could partially explain the poor results obtained.
 
-	% TODO: Thomas part about that
+	In 5 of the 9 snippets tested, minotaur failed to produce any optimization. Only in the case of example 3 minotaur successfully generated optimized code that even then differed slightly from the one presented in the paper. In the case of example 6, the standard LLVM was able to produce the expected optimization but minotaur failed to do so. Finally, in examples 7 and 8 minotaur produced new code which featured more instructions than the original, non-optimized code. In example 7, however, standard LLVM also produced an optimization but it was different from the one presented in the paper.
 
-	After those failed as well we decided to write our own very simple program to provoke errors.
+	We also attempted to reproduce optimizations reported by the paper authors in LLVM's GitHub issues. In most cases tested \footnote{https://github.com/llvm/llvm-project/issues/88168} \footnote{https://github.com/llvm/llvm-project/issues/86079} \footnote{https://github.com/llvm/llvm-project/issues/86068} \footnote{https://github.com/llvm/llvm-project/issues/86063} \footnote{https://github.com/llvm/llvm-project/issues/86061} both minotaur and LLVM were able to produce the expected optimizations. However, in one case \footnote{https://github.com/llvm/llvm-project/issues/88030} minotaur failed to reproduce the expected optimization. Only in one of the tested issues \footnote{https://github.com/llvm/llvm-project/issues/118114} minotaur produced an optimization that LLVM could not by eliminating an entire function.
 
-	% TODO
+	% TODO  conclude
 
 	\begin{figure*}[t]
 		\centering
