@@ -238,8 +238,6 @@
  	\section{Research Ideas}
  	%-------------------------------------------------------------------------------
  	
-	TODO
-
 	\subsection{Improved caching}
 
 	As previously discussed caching, which should be a key mechanism for reducing compile time, does not appear to operate very effectively in the current version of Minotaur. A plausible reason is that cached rewrites are keyed on the literal structure of extracted cuts, causing near misses on semantically equivalent cuts. A possible approach to this is the introduction of a canonicalization layer so that identical computations map to the same key. This could be implemented through the normalization of SSA identifiers, sorting of operands in commutative instructions and the standardization of other elements like vector masks. The impact of these changes could be evaluated by measuring improvements in cache hit rates, reduction of solver timeouts and compilation times, as well as by checking whether more rewrites are successfully applied across different programs.
@@ -267,17 +265,6 @@
 	But this is obviously not enough, one also has to measure the runtime in order to determine if the proposal delivered any benefits.
 	% What would be the potential impact: faster compile times while having similar or better runtime performance
 	Ideally the suggestion would improve compile times by not optimizing non critical code while keeping or maybe improving runtime of the code.
-
-
-	try to optimize how minotaur and alive and z3 interact
-
-	improve code generation
-
-	only use the complex runtime estimate (llvm mca) model to do less m3 work
-
-	add fast math support
-
-	multi pass the superoptimizer 	
 
 	\subsection{Arm Support}
 	% What is the problem: currently only x86 is supported
