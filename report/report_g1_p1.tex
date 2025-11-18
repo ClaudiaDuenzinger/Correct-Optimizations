@@ -233,15 +233,14 @@
 
 	\subsection{Small LLVM IR Samples}
 	These results from libgmp and libYUV prompted us to investigate further.
-	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in the paper. 
-	Since the original C source code is not provided, we attempted to optimize the IR directly.
-	However, we observed through different experiments that starting from LLVM IR rather than from the C code often leads to different optimization results, which could partially explain the poor results obtained. % TODO: Explanation please
+	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in section 5.6 of the minotaur paper as examples.
+	Since the original C source code for these is not provided, we attempted to optimize the IR directly.
+	However, we observed that running optimizations on LLVM IR often produces different results than compiling the original C code with optimizations enabled. This mismatch could potentially explain the poor results obtained.
 
-	In 5 of the 9 snippets tested, Minotaur failed to produce any optimization. % TODO: specify where those snippets are form
-	Only in the case of example 3 Minotaur successfully generated optimized code that even then differed slightly from the one presented in the paper. % TODO: what exactly is example 3. AND a difference is ok since you are using a different cpu right?
-	In the case of example 6, the standard LLVM was able to produce the expected optimization but Minotaur failed to do so. % TODO: what exactly is example 6. AND what does this mean llvm produced the optimized code and minotaur messed it up after receiving the optimized code, or does this mean minotaur timed out
-	Finally, in examples 7 and 8 Minotaur produced new code which featured more instructions than the original, non-optimized code. % TODO: yeah but this might be fine if its cheaper with regards to micro ops
-	In example 7, however, standard LLVM also produced an optimization but it was different from the one presented in the paper. % TODO: dumb question so both llvm and minotaur optimized the code?
+	In 5 of the 9 snippets extracted from the paper, Minotaur failed to produce any optimization. Only in the case of example 3 Minotaur successfully generated optimized code. The presented optimization differed from the one in the paper but such difference can be justified with the use of a different CPU.
+	In the case of example 6, LLVM with the \texttt{-O3} flag was able to produce the expected optimization but Minotaur failed to do so.
+	Finally, in examples 7 and 8 Minotaur produced new code which was more costly than the original, non-optimized code.
+	In example 7, however, LLVM with the \texttt{-O3} flag produced an optimization which was different from the one in the paper but equally as efficient.
 
 	We also attempted to reproduce optimizations reported by the papers authors in LLVM's GitHub issues.
 	In most cases tested \footnote{https://github.com/llvm/llvm-project/issues/88168} \footnote{https://github.com/llvm/llvm-project/issues/86079} \footnote{https://github.com/llvm/llvm-project/issues/86068} \footnote{https://github.com/llvm/llvm-project/issues/86063} \footnote{https://github.com/llvm/llvm-project/issues/86061}, both Minotaur and LLVM ,were able to produce the expected optimizations.
