@@ -235,11 +235,14 @@
 	These results from libgmp and libYUV prompted us to investigate further.
 	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in section 5.6 of the minotaur paper as examples.
 	Since the original C source code for these is not provided, we attempted to optimize the IR directly.
-	However, we observed that running optimizations on LLVM IR often produces different results than compiling the original C code with optimizations enabled. This mismatch could potentially explain the poor results obtained.
+	However, we observed that running optimizations on LLVM IR seemingly produces different results than compiling the original C.
+	This mismatch could potentially explain the poor results obtained on the snippets.
 
-	In 5 of the 9 snippets extracted from the paper, Minotaur failed to produce any optimization. Only in the case of example 3 Minotaur successfully generated optimized code. The presented optimization differed from the one in the paper but such difference can be justified with the use of a different CPU.
+	In 5 of the 9 snippets extracted from the paper, Minotaur failed to produce any optimization.
+	Only in the case of example 3 Minotaur successfully generated optimized code.
+	The presented optimization differed from the one in the paper but such difference could be explained with the use of a different CPU.
 	In the case of example 6, LLVM with the \texttt{-O3} flag was able to produce the expected optimization but Minotaur failed to do so.
-	Finally, in examples 7 and 8 Minotaur produced new code which was more costly than the original, non-optimized code.
+	Finally, in examples 7 and 8 Minotaur produced new code which was more costly than the original, non-optimized code according to LLVM MCA.
 	In example 7, however, LLVM with the \texttt{-O3} flag produced an optimization which was different from the one in the paper but equally as efficient.
 
 	We also attempted to reproduce optimizations reported by the papers authors in LLVM's GitHub issues.
