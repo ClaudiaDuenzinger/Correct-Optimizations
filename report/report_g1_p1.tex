@@ -114,14 +114,14 @@
 	Additionally, to reduce computation overhead, Minotaur also caches discovered transformations for reuse in future compilations.
  	
  	%Why is it important or interesting? 
- 	The use case of Minotaur is to further optimize already heavily optimized IR, form previous translation steps, which still often contain suboptimal code segments, particularly for SIMD operations.
+ 	The use case of Minotaur is to further optimize already heavily optimized IR from previous translation steps, which still often contain suboptimal code segments, particularly for SIMD operations.
 	The authors showed that even LLVM's advanced automatic-vectorizer produced redundant or inefficient SIMD instructions sequences.
 	For those missed opportunities, Minotaur can improve these suboptimal sections by replacing them with improved ones during the compilation.
 	Some of those optimizations could be generalized and added to LLVM.
 	Hence, enabling better and formally verified machine code generation through the use of Minotaur.
  	
  	%What is the state-of-the-art? What is the “research gap”? 
- 	Before Minotaur, several superoptimizer already existed that search through the program space, be it assembly or LLVM IR, for more efficient sequences, instead of performing set rewriting rules like traditional compilers.
+	Before Minotaur, several superoptimizers already existed that searched the program space -- either in assembly or LLVM IR -- for more efficient instruction sequences, rather than relying on the rewrite rules used by traditional compilers. 
 	Common examples include Souper -- with focus on scalar integer optimizations, which also uses LLVM IR -- and STOKE, which relies on stochastic search for faster x86 code block generation.
 	However, those tools only addressed part of the problem.
 	Souper~\cite{DBLP:souper} detects only improvements for integer operations, but not for floating-point or SIMD instructions.
@@ -142,8 +142,8 @@
  	%What is the proposed solution? 
  	%How it works at a high-level?
  	%At high level, the authors decomposed the optimization process into three main stages. 
- 	Because today's SMT solvers cannot optimize entire LLVM functions, Minotaur instead operates on single instruction level.
-	For this it breaks the LLVM function in SSA form down into cuts, which are small loop-free subsets of a given instruction's dependencies, to capture context and dependencies.
+ 	Because today's SMT solvers cannot efficiently reason about entire LLVM functions, Minotaur instead operates on single instruction level.
+	For this it breaks the LLVM function in SSA form down into cuts, which are small loop-free subsets of a given instruction's dependencies, to capture context.
 	The size of the cut influences the optimization, as too small cuts contain not enough context to determine a better code sequence, while too large cuts increase the solvers computation time dramatically.
 	Minotaur's cut extraction is noticeably more capable than previous ones since it is able to handle memory operations, vector operations and floating-point operations.
 	In comparison Souper could only handle integer instructions and loop-free control flow \cite{DBLP:souper}, both of which are also handled by Minotaur.
@@ -168,8 +168,9 @@
  	%-------------------------------------------------------------------------------
 
 	\subsection{Project Issues and Benchmarking Setup}
-	The paper did not provide about which version of Minotaur was used to run the benchmarks.
-	Since we could not determine which version was used it was decided to evaluate the most up to date version of Minotaur\footnote{\url{https://github.com/KiSchulz/Minotaur/tree/8ae5395286ba40fa29c16a0229fd3d6e9795d4cd}}.
+	The paper did not provide which version of Minotaur was used to run the benchmarks.
+	The paper did not specify which version of Minotaur was used for the benchmarks.
+	Since we could not determine the version used by the authors, we chose to evaluate the most up-to-date version of Minotaur\footnote{\url{https://github.com/KiSchulz/Minotaur/tree/8ae5395286ba40fa29c16a0229fd3d6e9795d4cd}}.
 	One important difference between the most recent version and the version referenced by the authors in the paper, is that the version in the paper relied on LLVM 18 whereas the newest version uses LLVM 20.
 
 	The most up to date version of Minotaur, as of writing, does not work out of the box.
@@ -182,28 +183,27 @@
 	More about that when the setup for libYUV is discussed.
 
 	Minotaur's caching seems to not fully work in the last release, as compiling a source file multiple consecutive times still leads to cache misses.
-	This might be caused differing inputs from LLVM's side.
+	This might be caused by differing inputs from LLVM's side.
 
-	Everything was compiled with the -O3 and -march=native flags as described in the paper.
+	Everything was compiled with the \texttt{-O3} and \texttt{-march=native} flags as described in the paper.
 	We benchmarked libgmp-6.2.1, as the paper did, and a fitting version of libYUV \footnote{\url{https://chromium.googlesource.com/libYUV/libYUV/+/8a93618f98e3bcd682615a704dd3410d0fee09e4}}, which is able to build with LLVM 20.
 	All runs were performed with the same parameters as the paper i.e. a cutting depth bound of four, total synthesizes time of five minutes and a one minute timeout for individual SMT queries.
-	The benchmarks were build and run on an AMD Ryzen 9 5900X whereas the authors used an AMD Ryzen 9 5950X.
+	The benchmarks were built and run on an AMD Ryzen 9 5900X whereas the authors used an AMD Ryzen 9 5950X.
 	The former has 12 cores running at up to 4.8 GHz, whereas the latter has 16 cores running at up to 4.9 GHz.
 
 	\subsection{libgmp}
 	According to the paper the build of libgmp with an empty cache took 440 minutes.
 	Our build took approximately 1020 minutes while using a partly dirty cache from previous attempts.
 	It seems unlikely that this discrepancy in build times could be caused by the difference in hardware.
-	It is more likely that it is due the authors using the offline mode of Minotaur, which we intentionally did not use.
+	It is more likely that this is due to the authors using the offline mode of Minotaur, which we intentionally did not use.
 	As discussed earlier the cache did not work as expected and using the offline mode would effectively have doubled the compile time.
-	The reason for this that after creating the cuts, for each cut Minotaur tries to synthesize a faster version.
-	After that is done another run of Minotaur is required to apply these.
-	But because this is not working properly this leads to another long compilation where new code is synthesized.
+	The reason for this is that after creating the cuts, Minotaur tries to synthesize a faster version of each.
+	After that is done another run of Minotaur is required to apply the new cuts, but because this is not working properly, it leads to another long compilation where new code is synthesized.
 
 	After building libgmp the provided tests were run.
 	Using regular LLVM all tests passed without any issue.
 	In contrast, using Minotaur at least two tests failed namely t-root and t-perfpow.
-	This indicates some correctness bug in Alive2 or in how Minotaur uses Alive2.
+	This indicates correctness issues in Alive2 or in how Minotaur uses Alive2.
 
 	We decided to ignore the failing tests and still proceed to benchmark libgmp.
 	An improvement in runtime, by using Minotaur, could not be shown in the benchmark (\ref{our_libgmp}).
@@ -211,9 +211,9 @@
 	One could be that any of the previous issues, which we were not able to resolve, caused this.
 	Or, alternatively that most of the relevant optimization found by Minotaur in LLVM 18 are now already present in LLVM 20.
 	This is not entirely impossible, since the authors were able to get some of the discovered optimizations merged into LLVM.
-	Further there were likely more improvements done between LLVM 18 to 20 making it even more difficult to discover optimizations.
+	Furthermore, there were likely more improvements done between LLVM 18 to 20 making it even more difficult to discover optimizations.
 	The high variance between the single benchmarks could either stem from Minotaur's rewrites or be caused by the system executing the benchmark.
-	Nevertheless the overall results did not change significantly between the benchmark runs.
+	Nevertheless the overall results did not change significantly between different benchmark runs.
 	Another interesting observation is that about half of the benchmark programs were slower and half faster than the LLVM baseline.
 	This seems to indicate an issue with the cost model used to estimate the found substitutions.
 
@@ -226,8 +226,8 @@
 
 	\subsection{libYUV}
 	In order to be able to even build libYUV and to not run into constant crashes in Alive2's LLVM execution tool during the compilation phase, its third party dependencies were compiled without Minotaur.
-	This would probably not have influenced the results to much since those dependencies seemed to be used mainly for auxiliary functionality.
-	Due the third party dependencies not being compiled by Minotaur, which the authors seemingly did, comparing compile times makes little sense.
+	This would probably not have influenced the results too much since those dependencies seemed to be used mainly for auxiliary functionality.
+	Due to the third party dependencies not being compiled by Minotaur, which the authors seemingly did, comparing compile times makes little sense.
 	We were not able to run the benchmark suite of libYUV, which doubles as its test suite, since it was failing the tests when using Minotaur.
 	Similar to the results for libgmp the regular LLVM build passed the tests with no issues.
 
@@ -246,16 +246,16 @@
 	In example 7, however, LLVM with the \texttt{-O3} flag produced an optimization which was different from the one in the paper but equally as efficient.
 
 	We also attempted to reproduce optimizations reported by the papers authors in LLVM's GitHub issues.
-	In most cases tested \footnote{https://github.com/llvm/llvm-project/issues/88168} \footnote{https://github.com/llvm/llvm-project/issues/86079} \footnote{https://github.com/llvm/llvm-project/issues/86068} \footnote{https://github.com/llvm/llvm-project/issues/86063} \footnote{https://github.com/llvm/llvm-project/issues/86061}, both Minotaur and LLVM ,were able to produce the expected optimizations.
-	However, in one case \footnote{https://github.com/llvm/llvm-project/issues/88030} Minotaur failed to reproduce the expected optimization.
-	Only in one of the tested issues \footnote{https://github.com/llvm/llvm-project/issues/118114} Minotaur produced an optimization that LLVM could not by eliminating an entire function.
+	In most cases tested \footnote{\url{https://github.com/llvm/llvm-project/issues/88168}} \footnote{\url{https://github.com/llvm/llvm-project/issues/86079}} \footnote{\url{https://github.com/llvm/llvm-project/issues/86068}} \footnote{\url{https://github.com/llvm/llvm-project/issues/86063}} \footnote{\url{https://github.com/llvm/llvm-project/issues/86061}}, both Minotaur and LLVM ,were able to produce the expected optimizations.
+	However, in one case \footnote{\url{https://github.com/llvm/llvm-project/issues/88030}} Minotaur failed to reproduce the expected optimization.
+	Only in one of the tested issues \footnote{\url{https://github.com/llvm/llvm-project/issues/118114}} Minotaur produced an optimization that LLVM could not by eliminating an entire function.
 
 	\subsection{Conclusion}
 	In conclusion it can be said that we were not able to reproduce the results of the paper.
 	The builds took significantly longer than expected.
 	We also found issues with the correctness of the applied optimizations.
 	Our runtime benchmark of libgmp did not show an improvement to the average runtime.
-	To reproduce the results form the paper one would have to fix the caching, the correctness issues and like also adjust the parameters to allow for a longer more thorough search for optimizations.
+	To reproduce the results from the paper one would have to fix the caching, the correctness issues and likely also adjust the parameters to allow for a longer more thorough search for optimizations.
  	
  	%-------------------------------------------------------------------------------
  	\section{Research Ideas}
@@ -272,7 +272,7 @@
 	\subsection{Dynamic Cutting Depth using Profile Guided Optimization}
 	% What is the problem: long compile times
 	% Why is it important: compiles already for hours for small projects which usually take seconds to build.
-	One major down side of Minotaur at the moment are its long compile times.
+	One major down side of Minotaur at the moment is its long compile times.
 	Even for small projects, which usually compile within seconds, it can take thousands of times longer, making it hours or even days.
 	Improving on compile time could enable a more practical use of Minotaur.
 	% Why is it difficult or what are the challenges: There are multiple ways to go about this either improve the proving speed, improve function synthesis, finding a dynamic depth bound as suggested by the paper
@@ -291,35 +291,35 @@
 	% What would be the potential impact: faster compile times while having similar or better runtime performance
 	Ideally the suggestion would improve compile times while keeping the runtime of a program constant or potentially improving it.
 
-	\subsection{Arm Support}
+	\subsection{Arm + NEON Support}
 	% What is the problem: currently only x86 is supported
 	Currently Minotaur only supports x86 architectures.
 	While it contains a large amount of x86, intrinsics it still uses LLVM IR which is platform-agnostic.
 	% What is the proposed idea: add ARM support
 	When considering ARM, LLVM support for NEON is more robust and more similar to x86 used in Minotaur than support for SVE.
-	Adding ARM support would entail implementing ca. 100 intrinsics (the x86 version of Minotaur uses ~ 165), of which many are type duplicates, i.e. 32 bit and 64 bit variants. % TODO: NEON or SVE support
+	Adding ARM support would entail implementing ca. 100 intrinsics (the x86 version of Minotaur uses 165), of which many are type duplicates, i.e. 32 bit and 64 bit variants.
 	While this seems feasible, it would also require modifying the register allocator and verifying the formal verification in Alive2 to support ARM specific instructions.
-	Furthermore, optimizations found on x86 might not be applicable to ARM and vice versa, so a new cost model would be needed. % TODO: afaik llvm mca supports arm cpus
-	As a result this seems to be a significant engineering effort, which also requires advanced ARM benchmarking to determine which operations are faster on ARM hardware. % TODO: I dont think this would require benchmarking since this would be provided by llvm mca or the manual of an architecture
+	LLVM MCA supports ARM already, so a similar cost model could be applied.
+	As a result, this seems to be a significant engineering effort, which also requires advanced ARM benchmarking to determine which operations are faster on ARM hardware.
 	% How would you measure and evaluate the idea: benchmark on ARM hardware
 	Benchmarks similar to the ones used in the paper could be used to evaluate the performance of Minotaur on ARM hardware.
 	% What would be the potential impact: wider applicability
 	Adding ARM support would increase the applicability of Minotaur and allow it to work on more hardware platforms.
 
-	\subsection{Developer Tools}
+	\subsection{Improved Introspection}
 	% What is the problem: Minotaur does not provide a well-thought out user experience
 	Currently Minotaur is largely a black box.
-	While it is possible to inspect the transformations via cache-dump of the redis database, this yields a user-unfriendly output.
+	While it is possible to inspect the transformations via \texttt{cache-dump} of the redis database, this yields a user-unfriendly output.
 	% What is the proposed idea: better introspection tools
-	An improvement would be better introspection tools to enhance Minotaur as a research tool specifically.	% TODO: to research what? to find new abstract optimization patterns?
+	An improvement would be better introspection tools to enhance Minotaur to allow the user to find and inspect rewrites easily.
 	The cache can be made queryable and interactive via a graphical interface.
 	Instead of raw LLVM IR one could display the rewrites generated by the synthesis.
 	This goes hand in hand with statistics gathering about which cuts produce the most optimizations, which optimizations are most common and which optimizations produce the highest speedup in the benchmarks.
 	For example Graphviz could be used to visualize the cuts and their optimizations and a snippet view could show code before and after optimizations.
 	% How would you measure and evaluate the idea: user study
-	One can let a third party developer use Minotaur without the tools and with the tools and gather feedback. % TODO: hard to do within the scope of the project. Use how
+	To evaluate we would do an internal user study in our group and gather feedback.
 	% What would be the potential impact: easier to use for researchers
-	This would make Minotaur and its optimization more accessible to researchers and make it less cumbersome to use.
+	This would make Minotaur and its optimizations more accessible to researchers and make it less cumbersome to use.
 
 
  	% %-------------------------------------------------------------------------------
