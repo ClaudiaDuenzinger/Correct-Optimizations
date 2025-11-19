@@ -60,7 +60,16 @@
  % to be able to draw some self-contained figs
  \usepackage{tikz}
  \usepackage{amsmath}
- 
+
+ \usepackage[acronym]{glossaries}
+ \makeglossaries 
+ \newacronym{pgo}{PGO}{Profile Guided Optimization}
+ \newacronym{ir}{IR}{Intermediate Representation}
+ \newacronym{simd}{SIMD}{Single Instruction Multiple Data}
+ \newacronym{mca}{MCA}{Machine Code Analyzer}
+ \newacronym{smt}{SMT}{Satifiablility Module Theories}
+ \newacronym{ssa}{SSA}{Static Single-Assignment}
+
  %-------------------------------------------------------------------------------
  \begin{document}
  	%-------------------------------------------------------------------------------
@@ -108,33 +117,33 @@
  	\subsection{Context}
  	%1. Context of the work (“Why”?)
  	%What is the problem? 
- 	Minotaur is a superoptimizer that tries to identify missed optimization opportunities of the LLVM compiler by slicing the generated IR and trying to synthesize new faster code.
+ 	Minotaur is a superoptimizer that tries to identify missed optimization opportunities of the LLVM compiler by slicing the generated \gls*{ir} and trying to synthesize new faster code.
 	Its synthesizer creates improved machine code by generating and comparing equivalent but cheaper instruction sequences.
 	To guarantee correctness of the optimization, Alive2 was extended to be able to formally verify the generated code.
 	Additionally, to reduce computation overhead, Minotaur also caches discovered transformations for reuse in future compilations.
  	
  	%Why is it important or interesting? 
- 	The use case of Minotaur is to further optimize already heavily optimized IR from previous translation steps, which still often contain suboptimal code segments, particularly for SIMD operations.
-	The authors showed that even LLVM's advanced automatic-vectorizer produced redundant or inefficient SIMD instructions sequences.
-	For those missed opportunities, Minotaur can improve these suboptimal sections by replacing them with improved ones during the compilation.
-	Some of those optimizations could be generalized and added to LLVM.
+ 	The use case of Minotaur is to further optimize already heavily optimized \gls*{ir} from previous translation steps, which still often contain suboptimal code segments, particularly for \gls*{simd} operations.
+	The authors showed that even LLVM's advanced automatic-vectorizer produced redundant or inefficient \gls*{simd} instructions sequences.
+	For those missed opportunities, Minotaur can improve suboptimal sections by replacing them with improved ones during the compilation.
+	Some of those optimizations could be generalized and added to LLVM,
 	Hence, enabling better and formally verified machine code generation through the use of Minotaur.
  	
  	%What is the state-of-the-art? What is the “research gap”? 
-	Before Minotaur, several superoptimizers already existed that searched the program space -- either in assembly or LLVM IR -- for more efficient instruction sequences, rather than relying on the rewrite rules used by traditional compilers. 
-	Common examples include Souper -- with focus on scalar integer optimizations, which also uses LLVM IR -- and STOKE, which relies on stochastic search for faster x86 code block generation.
+	Before Minotaur, several superoptimizers already existed that searched the program space -- either in assembly or LLVM \gls*{ir} -- for more efficient instruction sequences, rather than relying on the rewrite rules used by traditional compilers. 
+	Common examples include Souper~\cite{DBLP:souper} -- which focuses on scalar integer optimizations also using LLVM \gls*{ir} -- and STOKE~\cite{DBLP:stoke}, which relies on stochastic search for faster x86 code block generation.
 	However, those tools only addressed part of the problem.
-	Souper~\cite{DBLP:souper} detects only improvements for integer operations, but not for floating-point or SIMD instructions.
-	STOKE's~\cite{DBLP:stoke} improvements include complex optimizations, but the tool relies on randomized search to find those, making them harder to generalize into peephole optimizations.
+	Souper detects only improvements for integer operations, but not for floating-point or \gls*{simd} instructions.
+	STOKE's improvements include complex optimizations, but the tool relies on randomized search to find those, making them harder to generalize into peephole optimizations.
 	Therefore, the combined challenge of performing complex vector or floating point optimizations, formally verifying the transformation and integrating those capabilities into production compilers remained unsolved, until Minotaur. 
  	
  	%Why is it difficult? Or what are the challenges?
  	Designing an efficient and high performing superoptimizer included several challenges.
-	First, the search space for replacements of suboptimal code sequence is enormous, making an exhaustive search too computationally expensive.
-	Second, the formal checks adds further computational cost -- especially for complex SIMD and floating point operations.
-	Minotaur relies on SMT solvers for equivalency checks between the original code and the proposed optimization, but these solvers often struggle with large complex inputs.
+	First, the search space for replacements of suboptimal code sequences is enormous, making an exhaustive search too computationally expensive.
+	Second, the formal checks add further computational cost -- especially for complex \gls*{simd} and floating point operations.
+	Minotaur relies on \gls*{smt} solvers for equivalency checks between the original code and the proposed optimization, but these solvers often struggle with large complex inputs.
 	At the same time, a sufficiently large context window is needed to provide enough information to be able to find possible transformations.
-	Furthermore, since Minotaur aims for low level, hardware aware optimizations, the authors used detailed information about CPU pipelines to accurately model the performance of optimizations.
+	Since Minotaur aims for low level, hardware aware optimizations, the authors used detailed information about CPU pipelines to accurately model the performance.
 	These difficulties of realizing high performance without too much computational cost required a multi stage process. 
  	
  	\subsection{Contributions}
@@ -142,22 +151,22 @@
  	%What is the proposed solution? 
  	%How it works at a high-level?
  	%At high level, the authors decomposed the optimization process into three main stages. 
- 	Because today's SMT solvers cannot efficiently reason about entire LLVM functions, Minotaur instead operates on single instruction level.
-	In order to achieve this, it breaks the LLVM function in SSA form down into cuts, which are small loop-free subsets of a given instruction's dependencies, to capture context.
-	The size of the cut influences the optimization, as too small cuts contain not enough context to determine a better code sequence, while too large cuts increase the solvers computation time dramatically.
-	Minotaur's cut extraction is noticeably more capable than previous ones since it is able to handle memory operations, vector operations and floating-point operations.
-	In comparison Souper could only handle scalar integer instructions and loop-free control flow \cite{DBLP:souper}, both of which are also handled by Minotaur.
-	Through an empirical study, the authors selected the cut size of four, as it provided a good balance between finding most optimization while still running in an acceptable amount of time.
-	For each cut, a set of potential faster alternatives are synthesized.
-	These are then verified with Alive2, which the authors extended to support x86 SIMD intrinsics.
-	Lastly, for each optimization its speedup is estimated using a more accurate model (LLVM MCA).
+ 	Because today's \gls*{smt} solvers cannot efficiently reason about entire LLVM functions, Minotaur instead operates on single instruction level.
+	In order to achieve this, it breaks the LLVM function in \gls*{ssa} form down into cuts, which are small loop-free subsets of a given instruction's dependencies, to capture context.
+	The size of the cut influences the optimization, as small cuts contain not enough context to determine a better code sequence, while large cuts increase the solvers computation time dramatically.
+	Minotaur's cut extraction is noticeably more capable than previous ones since it is able to handle memory, vector and floating-point operations.
+	In comparison, Souper could only handle scalar integer instructions and loop-free control flow \cite{DBLP:souper}, both of which are also handled by Minotaur.
+	Through an empirical study, the authors selected the cutting depth of four, as it provided a good balance between finding most optimizations while still running in an acceptable amount of time.
+	For each cut, a set of potential faster alternatives is synthesized.
+	These are then verified with Alive2, which the authors extended to support x86 \gls*{simd} intrinsics.
+	Lastly, for each optimization its speedup is estimated using a more accurate model (LLVM \gls*{mca}).
 	If a faster version is found, it is applied.
 	In addition, the original and transformed code is cached for reuse in future compilations. 
 
  	%What are the key insights? 
  	%Or what are the novel aspects? 
  	To measure how Minotaur's optimizations influence the overall performance of larger software projects, the authors benchmarked Minotaur on the SPEC CPU 2017, libgmp and libYUV on Intel and AMD hardware with LLVM 18.
-	They determined a speedup of 1 - 7 percent, where integer SIMD fragments made up 75 percent of the discovered rewrites.
+	They determined a speedup of 1 - 7 percent, where integer \gls*{simd} fragments made up 75 percent of the discovered rewrites.
 	When the compilation is performed with an empty cache, Minotaur increased compile times significantly.
 	With a filled cache, however, only an additional 3 percent of computation time was needed.
 	The authors found 15 simple and general floating-point and vector optimizations, which they then reported to the LLVM project.
@@ -169,14 +178,14 @@
 
 	\subsection{Project Issues and Benchmarking Setup}
 	The paper did not specify which version of Minotaur was used for the benchmarks.
-	Since we could not determine the version used by the authors, we chose to evaluate the most up-to-date version of Minotaur\footnote{\href{https://github.com/KiSchulz/Minotaur/tree/8ae5395286ba40fa29c16a0229fd3d6e9795d4cd}{Used Minotuar Version}}.
-	One important difference between the most recent version and the version referenced in the paper, is that it relied on LLVM 18 whereas the newest version uses LLVM 20.
+	Since we could not determine the version used by the authors, we chose to evaluate the most up-to-date version of Minotaur\footnote{\href{https://github.com/KiSchulz/Minotaur/tree/8ae5395286ba40fa29c16a0229fd3d6e9795d4cd}{Link to Minotuar Version}}.
+	One important difference between the most recent version and the version referenced in the paper, is that it relied on LLVM 18 whereas the newest one uses LLVM 20.
 
 	The most up to date version of Minotaur, as of writing, does not work out of the box.
 	For it to not immediately crash on startup, the order in which the libraries are linked in Minotaur had to be changed.
 	This changes the order in which the offending dynamic libraries are loaded on startup and thereby fixing the issue of undefined symbols.
 
-	Minotaur uses Alive2's LLVM interpreter which is listed as highly experimental \footnote{\href{https://github.com/alivetoolkit/alive2/tree/c0f5434f402ad91714ee0952f686cd0f524920ad?tab=readme-ov-file\#running-the-standalone-llvm-execution-tool-alive-exec}{Alive2 LLVM Interpreter}} and caused multiple crashes,
+	Minotaur uses Alive2's LLVM interpreter which is listed as highly experimental \footnote{\href{https://github.com/alivetoolkit/alive2/tree/c0f5434f402ad91714ee0952f686cd0f524920ad?tab=readme-ov-file\#running-the-standalone-llvm-execution-tool-alive-exec}{Link to Alive2 LLVM Interpreter Section}} and caused multiple crashes,
 	some of which where not reliably reproducible and could therefore not be resolved.
 	In order to mitigate this, problematic source files were filtered.
 	More about this is discussed in section \ref{sec:libyuv}.
@@ -185,8 +194,8 @@
 	This might be caused by differing inputs from LLVM's side.
 
 	Everything was compiled with the \texttt{-O3} and \texttt{-march=native} flags as described in the paper.
-	We benchmarked libgmp-6.2.1, as the paper did, and a fitting version of libYUV \footnote{\href{https://chromium.googlesource.com/libYUV/libYUV/+/8a93618f98e3bcd682615a704dd3410d0fee09e4}{Used libYUV Version}}, which is able to build with LLVM 20.
-	All runs were performed with the same parameters as the paper, i.e. a cutting depth bound of four, total synthesizes time of five minutes and a one minute timeout for individual SMT queries.
+	We benchmarked libgmp-6.2.1, as the paper did, and a fitting version of libYUV \footnote{\href{https://chromium.googlesource.com/libYUV/libYUV/+/8a93618f98e3bcd682615a704dd3410d0fee09e4}{Link to libYUV Version}}, which is able to build with LLVM 20.
+	All runs were performed with the same parameters as the paper, i.e. a cutting depth bound of four, total synthesis time of five minutes and a one minute timeout for individual \gls*{smt} queries.
 	The benchmarks were built and run on an AMD Ryzen 9 5900X, whereas the authors used an AMD Ryzen 9 5950X.
 	The former has 12 cores running at up to 4.8 GHz, the latter has 16 cores running at up to 4.9 GHz.
 
@@ -231,23 +240,23 @@
 	We were not able to run the benchmark suite of libYUV, which doubles as its test suite, since it was failing the tests when using Minotaur.
 	Similar to the results for libgmp, the regular LLVM build passed the tests with no issues.
 
-	\subsection{Small LLVM IR Samples}
+	\subsection{Small LLVM \gls*{ir} Samples}
 	These results from libgmp and libYUV prompted us to investigate further.
-	We decided to try to reproduce some of the optimizations for short LLVM IR code snippets listed in section 5.6 of the Minotaur paper as examples.
-	Since the original C source code for these is not provided, we attempted to optimize the IR directly.
-	However, we observed that running optimizations on LLVM IR seemingly produces different results than compiling the original C.
+	We decided to try to reproduce some of the optimizations for short LLVM \gls*{ir} code snippets listed in section 5.6 from the original paper as examples.
+	Since the original C source code for these is not provided, we attempted to optimize the \gls*{ir} directly.
+	However, we observed that running optimizations on LLVM \gls*{ir} seemingly produces different results than compiling the original C.
 	This mismatch could potentially explain the poor results obtained on the snippets.
 
 	In 5 of the 9 snippets extracted from the paper, Minotaur failed to produce any optimization.
 	Only in the case of example 3 Minotaur successfully generated optimized code.
 	The presented optimization differed from the one in the paper but such difference could be explained with the use of a different CPU.
 	In the case of example 6, LLVM with the \texttt{-O3} flag was able to produce the expected optimization but Minotaur failed to do so.
-	Finally, in examples 7 and 8 Minotaur produced new code which was more costly than the original, non-optimized code according to LLVM MCA.
+	Finally, in examples 7 and 8 Minotaur produced new code which was more costly than the original, non-optimized code according to LLVM \gls*{mca}.
 	In example 7, however, LLVM with the \texttt{-O3} flag produced an optimization which was different from the one in the paper but equally as efficient.
 
-	We also attempted to reproduce optimizations reported by the papers authors in LLVM's GitHub issues.
+	We also attempted to reproduce optimizations reported by the paper's authors in LLVM's GitHub issues.
 	In most cases tested \footnote{\href{https://github.com/llvm/llvm-project/issues/88168}{Issue 88168}} \footnote{\href{https://github.com/llvm/llvm-project/issues/86079}{Issue 86079}} \footnote{\href{https://github.com/llvm/llvm-project/issues/86068}{Issue 86068}} \footnote{\href{https://github.com/llvm/llvm-project/issues/86063}{Issue 86063}} \footnote{\href{https://github.com/llvm/llvm-project/issues/86061}{Issue 86061}}, both Minotaur and LLVM were able to produce the expected optimizations.
-	However, in one case \footnote{\href{https://github.com/llvm/llvm-project/issues/88030}{Issue 88030}} Minotaur failed to reproduce the expected optimization.
+	However, in one case \footnote{\href{https://github.com/llvm/llvm-project/issues/88030}{Issue 88030}} Minotaur failed to do so.
 	Only in one of the tested issues \footnote{\href{https://github.com/llvm/llvm-project/issues/118114}{Issue 118114}} Minotaur produced an optimization that LLVM could not by eliminating an entire function.
 
 	\subsection{Conclusion}
@@ -266,26 +275,26 @@
 	As previously discussed, caching, which should be a key mechanism for reducing compile time, does not appear to operate very effectively in the current version of Minotaur.
 	A potential reason is that cached rewrites are keyed on the literal structure of extracted cuts, causing near misses on semantically equivalent cuts.
 	A possible approach to this is the introduction of a canonicalization layer, so that identical computations map to the same key.
-	This could be implemented through the normalization of SSA identifiers, sorting of operands in commutative instructions and the standardization of other elements like vector masks.
+	This could be implemented through the normalization of \gls*{ssa} identifiers, sorting of operands in commutative instructions and the standardization of other elements like vector masks.
 	The impact of these changes could be evaluated by measuring improvements in cache hit rates, reduction of solver timeouts and compilation times, as well as by checking whether more rewrites are successfully applied across different programs.
 
-	\subsection{Dynamic Cutting Depth}
+	\subsection{Dynamic Cutting Depth using \gls*{pgo}}
 	% What is the problem: long compile times
 	% Why is it important: compiles already for hours for small projects which usually take seconds to build.
-	One major down side of Minotaur at the moment is its long compile times.
+	At the moment, one major down side of Minotaur are its long compile times.
 	Even for small projects, which usually compile within seconds, it can take thousands of times longer, making it hours or even days.
-	Improving on compile time could enable a more practical use of Minotaur.
+	Improving on compile times could enable a more practical use of Minotaur.
 	% Why is it difficult or what are the challenges: There are multiple ways to go about this either improve the proving speed, improve function synthesis, finding a dynamic depth bound as suggested by the paper
-	The main challenge is how to save on time while compiling and to not lose the benefits of Minotaur, i.e. runtime performance improvements.
+	The main challenge is how to save on time while compiling and not to lose the benefits of Minotaur, i.e. runtime performance improvements.
 	% What is the proposed idea: using perf to find hot code sections and spend time on the most importent parts
 	% How will it work: first build the project with llvm, second run a benchmark with perf, third build it again with perf data and Minotaur which then dynamically determines the depth bound
 	To achieve this, one could try, as the paper suggested, to dynamically set the cutting depth.
-	Determining the cutting depth for each cut is hard since one would have to know how critical a pice of code is to the overall runtime performance.
+	Determining the cutting depth for each cut is hard since one would have to know how critical a piece of code is to the overall runtime performance.
 	One simple way of doing this would be to first build a program without Minotaur and then benchmark it while gathering data with a profiler.
 	This profiling data would then be used in a second compilation of the program, this time also using Minotaur, to determine the cutting depth dynamically.
-	In theory, two benefits could be derived from this approach, namely reducing total compile time, by not spending time on unimportant code, e.g. code that is only ever executed once, and second, it could also enable Minotaur to spend more time on important code impacting performance.
+	In theory, two benefits could be derived from this approach, namely reducing total compile time, by not spending time on unimportant code, e.g. code that is only ever executed once, and secondly, it could also enable Minotaur to spend more time on important code impacting performance.
 	% How would you measure and evaluate the idea: measure compile time and runtime between Minotaur without perf data and with perf data
-	Changes in compile time between the papers version of Minotaur and the augmented version would be the first important metric.
+	Changes in compile time between the paper's version of Minotaur and the augmented version would be the first important metric.
 	This is not enough, one would also have to measure the runtime of the produced code in order to determine if this idea delivers any benefits.
 	% What would be the potential impact: faster compile times while having similar or better runtime performance
 	Ideally, the suggestion would improve compile times while keeping the runtime of a program constant or potentially improving it.
@@ -293,12 +302,12 @@
 	\subsection{Arm + NEON Support}
 	% What is the problem: currently only x86 is supported
 	Currently, Minotaur only supports x86 architectures.
-	While it contains a large amount of x86, intrinsics it still uses LLVM IR which is platform-agnostic.
+	While it contains a large amount of x86, intrinsics it still uses LLVM \gls*{ir} which is platform-agnostic.
 	% What is the proposed idea: add ARM support
 	When considering ARM, LLVM support for NEON is more robust and more similar to x86 used in Minotaur than support for SVE.
 	Adding ARM support would entail implementing ca. 100 intrinsics (the x86 version of Minotaur uses 165), of which many are type duplicates, i.e. 32 bit and 64 bit variants.
 	While this seems feasible, it would also require modifying the register allocator and verifying the formal verification in Alive2 to support ARM specific instructions.
-	LLVM MCA supports ARM already, so a similar cost model could be applied.
+	LLVM \gls*{mca} supports ARM already, so a similar cost model could be applied.
 	As a result, this seems to be a significant engineering effort.
 	% How would you measure and evaluate the idea: benchmark on ARM hardware
 	Benchmarks similar to the ones used in the paper could be used to evaluate the performance of Minotaur on ARM hardware.
@@ -308,12 +317,12 @@
 	\subsection{Improved Introspection}
 	% What is the problem: Minotaur does not provide a well-thought out user experience
 	Currently, Minotaur is largely a black box.
-	While it is possible to inspect the transformations via \texttt{cache-dump} of the redis database, this yields a user-unfriendly output.
+	While it is possible to inspect the transformations via \texttt{cache-dump} of the redis database, the resulting output is difficult to read.
 	% What is the proposed idea: better introspection tools
-	An improvement would be better introspection tools to enhance Minotaur to allow the user to find and inspect rewrites easily.
+	An improvement would be better introspection tools to allow the user to find and inspect rewrites easily.
 	The cache can be made queryable and interactive via a graphical interface.
 	This goes hand in hand with statistics gathering about which cuts produce the most optimizations, which optimizations are most common and which optimizations produce the highest speedup in the benchmarks.
-	Instead of raw LLVM IR, one could display the rewrites using e.g. Graphviz to visualize the cuts and their optimizations.
+	Instead of raw LLVM \gls*{ir}, one could display the rewrites using e.g. Graphviz to visualize the cuts and their optimizations.
 	Furthermore, a snippet view could show code before and after optimizations.
 	% How would you measure and evaluate the idea: user study
 	To evaluate, we would do an internal user study in our group and gather feedback.
