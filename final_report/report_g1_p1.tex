@@ -1,0 +1,177 @@
+% !TeX document-id = {aa35f1f4-a045-449b-a615-5ff5efe1e0df}
+% !TeX root = report_g1_p1.tex
+% !TeX program = pdflatex
+% !BIB program = biber
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ % Template for USENIX papers.
+ %
+ % History:
+ %
+ % - TEMPLATE for Usenix papers, specifically to meet requirements of
+ %   USENIX '05. originally a template for producing IEEE-format
+ %   articles using LaTeX. written by Matthew Ward, CS Department,
+ %   Worcester Polytechnic Institute. adapted by David Beazley for his
+ %   excellent SWIG paper in Proceedings, Tcl 96. turned into a
+ %   smartass generic template by De Clarke, with thanks to both the
+ %   above pioneers. Use at your own risk. Complaints to /dev/null.
+ %   Make it two column with no page numbering, default is 10 point.
+ %
+ % - Munged by Fred Douglis <douglis@research.att.com> 10/97 to
+ %   separate the .sty file from the LaTeX source template, so that
+ %   people can more easily include the .sty file into an existing
+ %   document. Also changed to more closely follow the style guidelines
+ %   as represented by the Word sample file.
+ %
+ % - Note that since 2010, USENIX does not require endnotes. If you
+ %   want foot of page notes, don't include the endnotes package in the
+ %   usepackage command, below.
+ % - This version uses the latex2e styles, not the very ancient 2.09
+ %   stuff.
+ %
+ % - Updated July 2018: Text block size changed from 6.5" to 7"
+ %
+ % - Updated Dec 2018 for ATC'19:
+ %
+ %   * Revised text to pass HotCRP's auto-formatting check, with
+ %     hotcrp.settings.submission_form.body_font_size=10pt, and
+ %     hotcrp.settings.submission_form.line_height=12pt
+ %
+ %   * Switched from \endnote-s to \footnote-s to match Usenix's policy.
+ %
+ %   * \section* => \begin{abstract} ... \end{abstract}
+ %
+ %   * Make template self-contained in terms of bibtex entires, to allow
+ %     this file to be compiled. (And changing refs style to 'plain'.)
+ %
+ %   * Make template self-contained in terms of figures, to
+ %     allow this file to be compiled. 
+ %
+ %   * Added packages for hyperref, embedding fonts, and improving
+ %     appearance.
+ %   
+ %   * Removed outdated text.
+ %
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ \documentclass[letterpaper,twocolumn,10pt]{article}
+ \usepackage{usenix}
+ \usepackage[backend=biber, sorting=none]{biblatex}
+ \addbibresource{report_g1_p1.bib}
+
+ 
+ % to be able to draw some self-contained figs
+ \usepackage{tikz}
+ \usepackage{amsmath}
+
+ \usepackage[acronym]{glossaries}
+ \makeglossaries 
+ \newacronym{pgo}{PGO}{Profile Guided Optimization}
+ \newacronym{ir}{IR}{Intermediate Representation}
+ \newacronym{simd}{SIMD}{Single Instruction Multiple Data}
+ \newacronym{mca}{MCA}{Machine Code Analyzer}
+ \newacronym{smt}{SMT}{Satifiablility Module Theories}
+ \newacronym{ssa}{SSA}{Static Single-Assignment}
+
+ %-------------------------------------------------------------------------------
+ \begin{document}
+ 	%-------------------------------------------------------------------------------
+
+ 	%don't want date printed
+ 	\date{}
+ 	
+ 	% make title bold and 14 pt font (Latex default is non-bold, 16 pt)
+ 	\title{\Large \bf Correct Optimizations: Phase 2 Report Based on \citetitle{liu24:minotaur} \cite{liu24:minotaur}}
+ 	
+ 	%for single author (just remove % characters)
+ 	\author{
+ 		{\rm Kilian Schulz}\\
+ 		Technical University Munich
+ 		\and
+ 		{\rm Ilja Gamza}\\
+ 		Technical University Munich
+ 		\and
+ 		{\rm Tomás Gaspar}\\
+ 		Technical University Munich
+ 	} % end author
+ 	
+ 	\maketitle
+ 	
+ 	% %-------------------------------------------------------------------------------
+ 	% \begin{abstract}
+ 	% %-------------------------------------------------------------------------------
+ 	% 	TODO
+ 	% \end{abstract}
+ 	
+ 	
+ 	\section{Introduction}
+	% What is the problem?
+	% Why is it important or interesting?
+	Minotaur \cite{liu24:minotaur} is a superoptimizer that after computing optimizations caches those in a data base.
+	These optimizations consist of a key, which is the original code, and a value, which is an equivalent rewrite of the original code.
+	This caching is done in order to reduce the already substantial compile times of Minotaur.
+	Even when using this caching mechanism compile times are very long, up to hundreds of time longer than without Minotaur.
+	
+	% What is the state-of-the-art? What is the research-gap?
+	Currently Minotaur directly uses its extracted code segments as keys.
+	This approach can easily lead to near misses where for example an equivalent pice of code is already cached but has a different order of arguments.
+	To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization using multiple different steps.
+
+	% Why is it difficult? What are the challenges?
+	The core challenge is to keep the semantics of the keys, as changing those would lead to incorrect optimizations, and to enable application of the rewrites which fit to the original key.
+	This requires both a forward and backwards conversion from and to the canonical from for both the key and the value (the rewrite).
+	At the same time we try to reduce the canonical as much as possible in order to map as many semantically equivalent keys to one canonical key.
+
+	\section{Research Proposal}
+	% Current state in Minotuar
+
+	% What is the proposed solution?
+	% How it works at a high-level?
+	% What are the Key insights?
+	% What are novel aspects?
+
+	\section{Contributions}
+	% Some of the debugging we did in the mean time.
+
+	% How did you design and implement the system?
+
+	% segments based on what we implemented e.g. unused parameter elimination, parameter sorting
+
+	Our code is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
+
+	\section{Evaluation}
+	\subsection{Setup}
+
+	% Experimental setup and methodology.
+	% hardware and software selection for benchmarking
+	% how we got our baseline measurements
+
+	\subsection{Results}
+	% Evaluation results
+	% just the results no interpretation
+
+	The key metrics which measured for the following benchmarks were the cache size, cache hit rate and number of applied rewrites.
+
+
+	Since our canonicalization steps are compositional we measure the impact of each step and combination of steps.
+
+	% might not make sense depending on which steps are actually implemented
+	We also tested changing the order of canonicalization steps where possible and measured the effect.
+
+	We also measure the total compilation time for several select software projects.
+
+	\section{Discussion}
+	% Key findings
+	% interpretation/explanation of the results
+
+	\section{Conclusion}
+	% did it work, what issues are remaining, future work
+ 	
+	\printbibliography
+ 	
+ 	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ \end{document}
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ %%  LocalWords:  endnotes includegraphics fread ptr nobj noindent
+ %%  LocalWords:  pdflatex acks
+ 
