@@ -1,0 +1,83 @@
+\begin{tikzpicture}
+% -------------------------
+% Nodes
+% -------------------------
+\begin{scope}[
+  every node/.style={draw, rounded corners, thick, align=center}
+]
+
+% Invisible start / end
+\node[draw=none] (start) at (-3, 0) {};
+\node[draw=none] (end)   at (15, 0) {};
+
+% LLVM pipeline
+\node (frontend) at (0, 0)   {Frontend};
+\node (opt1)     at (3, 0)   {Early-phase\\optimization passes\\and autovectorizer};
+\node (minotaur) at (6, 0)   {Minotaur\\online pass};
+\node (opt2)     at (9, 0)   {Late-phase\\optimization passes};
+\node (backend)  at (12, 0)  {Machine code\\generation};
+
+% Minotaur internals
+\node (slicer)     at (-3, -4.5) {Cut extraction\\(Slicer)};
+\node (canon)      at (0, -4.5) {Canonicalization\\(Canonicalizer)};
+\node (cache)      at (6, -3) {Cache};
+
+\node (enumerator) at (3, -6)   {Rewrite\\enumeration\\(Enumerator)};
+\node (fastcost)   at (6, -6)  {Fast cost\\estimation};
+\node (prover)     at (9, -6)  {Rewrite prover\\(Z3)};
+\node (llvmMCA)    at (12, -6)  {Accurate\\cost estimation\\(LLVM MCA)};
+
+\end{scope}
+
+% -------------------------
+% Edges
+% -------------------------
+\begin{scope} [>={Stealth[black]}]
+% External inputs / outputs
+\path [->] (start) edge node[above, align=left] {C/C++\\Rust\\Swift} (frontend);
+\path [->] (backend) edge node[above, align=right] {Machine\\Code} (end);
+
+% LLVM pipeline
+\path [->] (frontend) edge (opt1);
+\path [->] (opt1)     edge (minotaur);
+\path [->] (minotaur) edge (opt2);
+\path [->] (opt2)     edge (backend);
+
+% Minotaur pipeline
+\path [->] (minotaur) edge (slicer);
+\path [->] (slicer)   edge (canon);
+
+\path [->] (canon) edge node[right]{Cache miss} (enumerator);
+\path [->] (enumerator) edge (fastcost);
+\path [->] (fastcost)   edge (prover);
+\path [->] (prover)     edge (llvmMCA);
+\path [->] (llvmMCA)    edge (minotaur);
+
+\path [->] (canon) edge node[right]{Cache hit} (cache);
+\path [->] (cache) edge (minotaur);
+
+\end{scope}
+
+% -------------------------
+% Clusters (boxes)
+% -------------------------
+\node[
+  draw,
+  thick,
+  rounded corners,
+  fit=(frontend)(opt1)(minotaur)(opt2)(backend),
+  label=above:{LLVM Compilation Pipeline},
+  inner sep=6mm
+] {};
+
+\node[
+  draw,
+  thick,
+  rounded corners,
+  fit=(slicer)(canon)(cache)(enumerator)(fastcost)(prover)(llvmMCA),
+  label=above:{Minotaur},
+  inner sep=6mm
+] {};
+
+\end{tikzpicture}
+

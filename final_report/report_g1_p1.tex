@@ -61,6 +61,12 @@
  
  % to be able to draw some self-contained figs
  \usepackage{tikz}
+ \usetikzlibrary{
+  arrows.meta,
+  positioning,
+  fit,
+  calc
+}
  \usepackage{amsmath}
 
  \usepackage[acronym]{glossaries}
@@ -106,20 +112,20 @@
  	\section{Introduction}
 	% What is the problem?
 	% Why is it important or interesting?
-	Minotaur \cite{liu24:minotaur} is a superoptimizer that after computing optimizations caches those in a data base.
+	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches those in a data base.
 	These optimizations consist of a key, which is the original code, and a value, which is an equivalent rewrite of the original code.
-	This caching is done in order to reduce the already substantial compile times of Minotaur.
-	Even when using this caching mechanism compile times are very long, up to hundreds of time longer than without Minotaur.
+	This caching is done in order to reduce the already substantial runtimes of Minotaur.
+	Even when using this caching mechanism, compile times are very long, up to hundreds of time longer than without Minotaur.
 	
 	% What is the state-of-the-art? What is the research-gap?
-	Currently Minotaur directly uses its extracted code segments as keys.
-	This approach can easily lead to near misses where for example an equivalent pice of code is already cached but has a different order of arguments.
-	To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization using multiple different steps.
+	Currently Minotaur directly uses the extracted code segments as keys.
+	This approach can easily lead to near misses, where an equivalent pice of code is already cached, but for instance has a different order of arguments.
+	To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
 
 	% Why is it difficult? What are the challenges?
-	The core challenge is to keep the semantics of the keys, as changing those would lead to incorrect optimizations, and to enable application of the rewrites which fit to the original key.
-	This requires both a forward and backwards conversion from and to the canonical from for both the key and the value (the rewrite).
-	At the same time we try to reduce the canonical as much as possible in order to map as many semantically equivalent keys to one canonical key.
+	The core challenge is to keep the semantics of the keys, as changing those would lead to incorrect optimizations being applied, and to enable application of the rewrites which fit to the original key.
+	This requires both a forward and in some cases a backwards conversion from and to the canonical from for both the key and the value (the rewrite).
+	At the same time we try to reduce the key space as much as possible in order to map as many semantically equivalent keys to one canonical key.
 
 	\section{Research Proposal}
 	% Current state in Minotuar
@@ -130,13 +136,90 @@
 	% What are novel aspects?
 
 	\section{Contributions}
+	Our code is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
+
+	\subsection{Canonicalization}
+	% How did you design and implement the system?
+	% TODO: look into https://github.com/llvm/llvm-project/tree/main/llvm/tools/llvm-reduce
+	\begin{figure*}[t]
+		\begin{center}
+			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated}
+			\input{architecture.tex}
+		\end{center}
+	\end{figure*}
+
+	\subsection{Canonicalization Steps}
+	% segments based on what we implemented e.g. unused parameter elimination, parameter sorting
+	In the following we explain each canonicalization step and show that applying it yields an equivalent function, which has the same execution time and reduces the key space.
+
+	% TODO to show correctness of each step show that each original function and canon function compute the same after potentially remapping the arguments
+
+	\paragraph{Elimination of Unused Function Arguments}
+	% TODO add example of the step applied to llvm code
+	Some function have unused arguments.
+	% TODO explain how values are represented in the cache so the last part of this sentence makes sense
+	Those can simply be eliminated during the forward pass.
+	% \\\textbf{Forward Pass:}
+	Assuming the given input function $f$ has an unused argument we can define the following.
+	Let $f: T_1 \times ... \times T_i \times ... \times T_n \to R$ and $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ be $n$-ary and $n-1$-ary functions respectively with
+	\[
+		f(t_1, ..., t_n) := g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n), t_j \in T_j
+	\]
+	Since $t_i$ is not part of the function signature of $g$ we can define a new function $f' := g$.
+	This obviously does not change what is computed since
+	\begin{align*}
+		f(t_1, ..., t_n) &= g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n) \\
+						 &= f'(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n)
+	\end{align*}
+	% TODO: talk about why we can modify the function signature and why this usually can not be done
+	Due to the implicit nature of the function signature in the values of the cache and the structure of Minotaur no additional work is required in relation to this step.
+
+	\paragraph{Sorting of Function Arguments}
+	% TODO add example of the step applied to llvm code
+	Another modification that is done to the function signature is that we sort the arguments.
+	The arguments are sorted by type-name and internally by when they are used inside the function body.
+	Sorting by the type name is done in order to avoid cases where the function body is the same but a cache miss occurs due to the order of the types being different.
+	To achieve a total order on the function arguments, each set of arguments of the same type are sorted by when they are used in the function body.
+	This makes the argument order dependent on the function body and has to be taken into account when ordering the canonicalization steps.
+	% This step also does not require any backward pass.
+	The correctness of the step is shown in the following.
+	Let $f: T_1 \times ... \times T_n \to R$ be the input function and $f': T_{\rho{(1)}} \times ... \times T_{\rho{(n)}} \to R$ the output function with $\rho: [n] \to [n]$ being a bijective function i.e. a permutation.
+	We define 
+	\begin{align*}
+		f'(t_{\rho{(1)}}, ..., t_{\rho{(n)}}) &:= f(t_{\rho^{-1}{(\rho{(1)})}}, ..., t_{\rho^{-1}{(\rho{(n)})}}) \\
+										  &= f(t_1, ..., t_n), t_i \in T_i \\ 
+	\end{align*}
+	This clearly shows that $f$ and $f'$ compute the same for all inputs.
+	Similar to the elimination of unused arguments no further work is required.
+
+	\paragraph{Renaming of Function Arguments}
+	% TODO add example of the step applied to llvm code
+
+	\paragraph{Replacing Greater-Than with Less-Than}
+	% TODO add example of the step applied to llvm code
+
+	\paragraph{Non-strict Operator Replacement}
+	% TODO add example of the step applied to llvm code
+	The idea is to reduce the number of comparison operators that are available.
+	This is done by replacing non-strict comparison operators like $\leq$ with $<$.
+	To introduce additional operations this is only done when a constant is one of the operants.
+	This constant is then adjusted accordingly if no prevented by an edge case like the constant being already the maximum or minimum value possible for the data type.
+	So given some expression like $ x \leq c$ it would be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment possible for $c$.
+	% TODO: under which structure does this hold
+	% TODO: define structure/theory?
+	\[
+		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
+	\]
+	An analogous argument can be made for the $\geq$ and for a swapped operands and works for both integral and floating point types.
+	Currently vector types are filtered.
+
+	\subsection{Ordering of the Canonicalization Steps}
+	% Describe the order in which the steps are applied and explain why
+
+	\subsection{Issues with the original version}
 	% Some of the debugging we did in the mean time.
 
-	% How did you design and implement the system?
-
-	% segments based on what we implemented e.g. unused parameter elimination, parameter sorting
-
-	Our code is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
+	% TODO describe the order of the steps
 
 	\section{Evaluation}
 	\subsection{Setup}
@@ -149,15 +232,11 @@
 	% Evaluation results
 	% just the results no interpretation
 
-	The key metrics which measured for the following benchmarks were the cache size, cache hit rate and number of applied rewrites.
-
-
+	The key metrics which measured for the following benchmarks were the cache size, cache hit rate, number of applied rewrites and solver time.
 	Since our canonicalization steps are compositional we measure the impact of each step and combination of steps.
-
 	% might not make sense depending on which steps are actually implemented
 	We also tested changing the order of canonicalization steps where possible and measured the effect.
-
-	We also measure the total compilation time for several select software projects.
+	Furthermore, we measure the total compilation time for several select software projects.
 
 	\section{Discussion}
 	% Key findings
