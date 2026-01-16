@@ -18,14 +18,11 @@
 \node (backend)  at (12, 0)  {Machine code\\generation};
 
 % Minotaur internals
-\node (slicer)     at (-3, -4.5) {Cut extraction\\(Slicer)};
-\node (canon)      at (0, -4.5) {Canonicalization\\(Canonicalizer)};
-\node (cache)      at (6, -3) {Cache};
-
-\node (enumerator) at (3, -6)   {Rewrite\\enumeration\\(Enumerator)};
-\node (fastcost)   at (6, -6)  {Fast cost\\estimation};
-\node (prover)     at (9, -6)  {Rewrite prover\\(Z3)};
-\node (llvmMCA)    at (12, -6)  {Accurate\\cost estimation\\(LLVM MCA)};
+\node (slicer)     at (2, -3) {Cut extraction\\(Slicer)};
+\node [fill=blue!50] (canon)      at (2, -5) {Canonicalization\\(Canonicalizer)};
+\node [fill=blue!50] (deCanon)    at (8, -3) {De-Canonicalization\\(Canonicalizer)};
+\node (cache)      at (5, -5) {Cache};
+\node (computeOpt) at (11, -5) {Compute\\Optimization};
 
 \end{scope}
 
@@ -47,14 +44,12 @@
 \path [->] (minotaur) edge (slicer);
 \path [->] (slicer)   edge (canon);
 
-\path [->] (canon) edge node[right]{Cache miss} (enumerator);
-\path [->] (enumerator) edge (fastcost);
-\path [->] (fastcost)   edge (prover);
-\path [->] (prover)     edge (llvmMCA);
-\path [->] (llvmMCA)    edge (minotaur);
+\path [->] (canon) edge (cache);
+\path [->] (cache) edge node[left]{Cache hit} (deCanon);
+\path [->] (cache) edge node[above]{Cache miss} (computeOpt);
+\path [->] (computeOpt) edge (deCanon);
+\path [->] (deCanon) edge (minotaur);
 
-\path [->] (canon) edge node[right]{Cache hit} (cache);
-\path [->] (cache) edge (minotaur);
 
 \end{scope}
 
@@ -74,10 +69,20 @@
   draw,
   thick,
   rounded corners,
-  fit=(slicer)(canon)(cache)(enumerator)(fastcost)(prover)(llvmMCA),
+  fit=(slicer)(canon)(cache)(computeOpt)(deCanon),
   label=above:{Minotaur},
   inner sep=6mm
 ] {};
+
+\node[
+  draw,
+  thick,
+  rounded corners,
+  fit=(cache)(computeOpt),
+  label=above:{Inference},
+  inner sep=2mm
+] {};
+
 
 \end{tikzpicture}
 

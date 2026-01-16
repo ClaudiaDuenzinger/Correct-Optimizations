@@ -68,6 +68,7 @@
   calc
 }
  \usepackage{amsmath}
+ \usepackage{listings}
 
  \usepackage[acronym]{glossaries}
  \makeglossaries 
@@ -113,46 +114,86 @@
 	% What is the problem?
 	% Why is it important or interesting?
 	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches those in a data base.
-	These optimizations consist of a key, which is the original code, and a value, which is an equivalent rewrite of the original code.
-	This caching is done in order to reduce the already substantial runtimes of Minotaur.
-	Even when using this caching mechanism, compile times are very long, up to hundreds of time longer than without Minotaur.
+	These optimizations consist of a key, which is the original code, and a value, which is an equivalent, but faster, rewrite of the original code.
+	This caching is done in order to reduce the substantial runtimes of Minotaur for future compilations of the same or a similar program.
+	Minotaurs compile times, with a cold cache, can easily be hundreds of time slower than with regular LLVM \cite{liu24:minotaur}.
 	
 	% What is the state-of-the-art? What is the research-gap?
-	Currently Minotaur directly uses the extracted code segments as keys.
-	This approach can easily lead to near misses, where an equivalent pice of code is already cached, but for instance has a different order of arguments.
-	To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
+	% Current state in Minotuar
+	Currently Minotaur directly uses the extracted code segments in LLVM IR as the keys and stores those along side a rewrite, in Minotaurs own IR as value, in the cache as shown in example \ref{fig:kv}.
+	\begin{figure*}[t]
+	\centering
+	\caption{\label{fig:kv} Example of a key value pair as it is found in the Minotaur cache.}
+	\begin{lstlisting}[language=llvm]
+	key:
+		define i1 @cut(i64 %__n2, i16 %__n3) {
+			%__n0 = sub nsw i64 0, %__n2
+			%__n1 = icmp samesign ult i64 %__n0, 2033
+			ret i1 %__n1
+		}
+	\end{lstlisting}
+	\begin{lstlisting}
+	value:
+		(icmp_sgt (var i64 %__n2) (reservedconst i64 |i64 -2033|) b1)	
+	\end{lstlisting}
+ 	\end{figure*}
+
+	This approach can easily lead to near misses, where an equivalent code segment is already cached, but for instance has unused arguments, leading to a cache miss and a costly recompute of an optimization.
+	% To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
 
 	% Why is it difficult? What are the challenges?
-	The core challenge is to keep the semantics of the keys, as changing those would lead to incorrect optimizations being applied, and to enable application of the rewrites which fit to the original key.
-	This requires both a forward and in some cases a backwards conversion from and to the canonical from for both the key and the value (the rewrite).
-	At the same time we try to reduce the key space as much as possible in order to map as many semantically equivalent keys to one canonical key.
+	One way to avoid this issue is to attempt to increase the number of cache hits while keeping the correctness of the mapping between keys and their rewrite.
+	This leads to reduced compile times of Minotaur even when starting from a cold cache.
 
 	\section{Research Proposal}
-	% Current state in Minotuar
-
 	% What is the proposed solution?
 	% How it works at a high-level?
-	% What are the Key insights?
+	Our solution introduces an additional step after the cut extraction.
+	It performs multiple code transformations, with the goal of reducing the number of possible equivalent keys, mapping those to one canonicalized key.
+
+	% What are the key insights?
 	% What are novel aspects?
+	The idea is that this leads to fewer cache entries, increasing the cache hit rate and reducing the number of slow optimization searches by Minotaur.
+	For large enough projects this can already take effect during a build even when starting with an empty cache thereby reducing compile time.
 
-	\section{Contributions}
-	Our code is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
+	\section{Canonicalization}
+	Our extended version of Minotaur is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
 
-	\subsection{Canonicalization}
 	% How did you design and implement the system?
 	% TODO: look into https://github.com/llvm/llvm-project/tree/main/llvm/tools/llvm-reduce
+	The canonicalizer is placed as a pre- and postprocessing step around Minotaurs inference step.
+	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a canonicalized version of the input which is then forwarded to the inference step.
+	In the following this transformation is called canonicalization.
+	After the inference step is finishes and returns a rewrite (in Minotaurs own IR), the canoncializer again performs transformations on the rewrites.
+	This process is called de-canonicalization.
+	The structure of the augmented Minotaur with our canonicalizer is shown in figure \ref{fig:architecture}.	
+
+	% TODO add a figure ilustrating our canonicalization steps to support this paragraph
+	Each canonicalization-step in our implementation consists of a canonicalization function and a de-canonicalization function.
+	The canonicalization-steps are ordered as to not interfere with each other.
+	More on that is discussed in section \ref{sec:ordering}.
+	During the canonicalization process every canonicalization function is applied iteratively in this predefined order.
+	% TODO: talk about why we need the reverse order
+	For de-canonicalization the de-canonicalization functions are applied in the reverse order in which the canonicalization-steps are specified.
+	It is also possible to pass information between the pairs of canonicalization and de-canonicalization functions of each step if required.
+	This enables the support for more complex transformations.
+
 	\begin{figure*}[t]
 		\begin{center}
-			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated}
+			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated. The highlighted blocks were added for (De-)Canonicalization.}
 			\input{architecture.tex}
 		\end{center}
 	\end{figure*}
 
-	\subsection{Canonicalization Steps}
-	% segments based on what we implemented e.g. unused parameter elimination, parameter sorting
-	In the following we explain each canonicalization step and show that applying it yields an equivalent function, which has the same execution time and reduces the key space.
+	\subsection{Canonicalization Steps \label{sec:steps}}
+	% TODO: talk about what equivalent means here
+	% TODO: fix this version of equivalence since it does not quite work for changes in signature
+	In the following we explain each canonicalization-step and show its correctness.
+	We show for each canonicalization step that applying it yields an equivalent function that has the same depth as the original function.
+	In this case two functions are considered equivalent iff appling them to the same arguments yield an equal output (and changes to memory).
+	The depth is kept constant as increasing this has large impact on runtime as shown in original paper \cite{liu24:minotaur}.
 
-	% TODO to show correctness of each step show that each original function and canon function compute the same after potentially remapping the arguments
+	An example of all the steps applied sequentially to an example input is shown in figure \ref{fig:canon_full}
 
 	\paragraph{Elimination of Unused Function Arguments}
 	% TODO add example of the step applied to llvm code
@@ -207,14 +248,86 @@
 	So given some expression like $ x \leq c$ it would be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment possible for $c$.
 	% TODO: under which structure does this hold
 	% TODO: define structure/theory?
+	% TODO: explain further for floating point types
 	\[
 		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
 	\]
 	An analogous argument can be made for the $\geq$ and for a swapped operands and works for both integral and floating point types.
 	Currently vector types are filtered.
 
-	\subsection{Ordering of the Canonicalization Steps}
+	\begin{figure*}[t]
+	\centering
+	\caption{\label{fig:canon_full} Example applying each canonicalization step.}
+	\begin{lstlisting}[language=llvm, escapechar=!]
+	input:
+		define i1 @cut(i32 %a, float %b, i32 %c, float %d) {
+			%1 = fcmp uge float %b, %d
+			%2 = icmp sle i32 %c, 15
+
+			%3 = and i1 %1, %2
+
+			ret i1 %3
+		}
+	\end{lstlisting}
+	\begin{lstlisting}[language=llvm, escapechar=!]
+	unused argument elimination:	
+		define i1 @cut !\colorbox{blue!50}{(float \%b, i32 \%c, float \%d)}! {
+			%1 = fcmp uge float %b, %d
+			%2 = icmp sle i32 %c, 15
+
+			%3 = and i1 %1, %2
+
+			ret i1 %3
+		}
+	\end{lstlisting}
+	\begin{lstlisting}[language=llvm]
+	replacing greater-than with less-than:	
+		define i1 @cut(float %b, i32 %c, float %d) {
+			%1 = fcmp ule float %d, %b
+			%2 = icmp sle i32 %c, 15
+
+			%3 = and i1 %1, %2
+
+			ret i1 %3
+		}
+	\end{lstlisting}
+	\begin{lstlisting}[language=llvm]
+	replacing non-strict operators:	
+		define i1 @cut(float %b, i32 %c, float %d) {
+			%1 = fcmp ule float %d, %b
+			%2 = icmp slt i32 %c, 16
+
+			%3 = and i1 %1, %2
+
+			ret i1 %3
+		}
+	\end{lstlisting}
+	\begin{lstlisting}[language=llvm]
+	argument sorting:	
+		define i1 @cut(float %d, float %b, i32 %c) {
+			%1 = fcmp uge float %d, %b
+			%2 = icmp sle i32 %c, 15
+
+			%3 = and i1 %1, %2
+
+			ret i1 %3
+		}
+	\end{lstlisting}
+	\begin{lstlisting}[language=llvm]
+	argument renaming:	
+		define i1 @cut(float %__canonArg, float %__canonArg1,
+			i32 %__canonArg2, i32 %__canonArg3) {
+			%1 = fcmp uge float %__canonArg, %__canonArg1
+			%2 = icmp sge i32 %__canonArg2, %__canonArg3
+		}
+	\end{lstlisting}
+	
+ 	\end{figure*}
+
+
+	\subsection{Ordering of the Canonicalization Steps \label{sec:ordering}}
 	% Describe the order in which the steps are applied and explain why
+	% first greater... to less... change then argument ordering then argument renaming
 
 	\subsection{Issues with the original version}
 	% Some of the debugging we did in the mean time.
@@ -241,6 +354,9 @@
 	\section{Discussion}
 	% Key findings
 	% interpretation/explanation of the results
+
+	\section{Future Work}
+	% perform load ordering so between loads and also where to load data in a function e.g. at the beginning or end
 
 	\section{Conclusion}
 	% did it work, what issues are remaining, future work
