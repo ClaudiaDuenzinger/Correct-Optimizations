@@ -121,22 +121,8 @@
 	% What is the state-of-the-art? What is the research-gap?
 	% Current state in Minotuar
 	Currently Minotaur directly uses the extracted code segments in LLVM IR as the keys and stores those along side a rewrite, in Minotaurs own IR as value, in the cache as shown in example \ref{fig:kv}.
-	\begin{figure*}[t]
-	\centering
-	\caption{\label{fig:kv} Example of a key value pair as it is found in the Minotaur cache.}
-	\begin{lstlisting}[language=llvm]
-	key:
-		define i1 @cut(i64 %__n2, i16 %__n3) {
-			%__n0 = sub nsw i64 0, %__n2
-			%__n1 = icmp samesign ult i64 %__n0, 2033
-			ret i1 %__n1
-		}
-	\end{lstlisting}
-	\begin{lstlisting}
-	value:
-		(icmp_sgt (var i64 %__n2) (reservedconst i64 |i64 -2033|) b1)	
-	\end{lstlisting}
- 	\end{figure*}
+
+	\input{kv_example.tex}
 
 	This approach can easily lead to near misses, where an equivalent code segment is already cached, but for instance has unused arguments, leading to a cache miss and a costly recompute of an optimization.
 	% To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
@@ -164,7 +150,7 @@
 	The canonicalizer is placed as a pre- and postprocessing step around Minotaurs inference step.
 	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a canonicalized version of the input which is then forwarded to the inference step.
 	In the following this transformation is called canonicalization.
-	After the inference step is finishes and returns a rewrite (in Minotaurs own IR), the canoncializer again performs transformations on the rewrites.
+	After the inference step is finishes and returns a rewrite (in Minotaurs own IR), the canonicalizer again performs transformations on the rewrites.
 	This process is called de-canonicalization.
 	The structure of the augmented Minotaur with our canonicalizer is shown in figure \ref{fig:architecture}.	
 
@@ -188,15 +174,51 @@
 	\subsection{Canonicalization Steps \label{sec:steps}}
 	% TODO: talk about what equivalent means here
 	% TODO: fix this version of equivalence since it does not quite work for changes in signature
-	In the following we explain each canonicalization-step and show its correctness.
-	We show for each canonicalization step that applying it yields an equivalent function that has the same depth as the original function.
-	In this case two functions are considered equivalent iff appling them to the same arguments yield an equal output (and changes to memory).
-	The depth is kept constant as increasing this has large impact on runtime as shown in original paper \cite{liu24:minotaur}.
+	% TODO: talk about that each step reduces the size of the key space and also add this to each prove
+	% TODO: explain what the depth of function is
+	In the following we explain each canonicalization-step.
+	We selected our steps such that each step is correct, productive and does not modify the functions depth.
+	Correctness means that both the canonical function and the original function applied to the same arguments compute the same result( and have the same effect on memory also with respect to order of memory operation).
+	A step is productive iff it reduces the size of the space of all possible keys after the step is applied.
+	%The depth is kept constant as increasing this has a large impact on runtime as shown in original paper \cite{liu24:minotaur}.
 
+	Those criteria were chosen to only allow for simple transformation steps.
+	It might be possible to relax the correctness definition.
+	Similarly the definition of productivity could be relaxed such that it only holds over all steps but not for every individual step.
+	Also the depth constraint is not strictly required and could be dropped, but this would likely result in more complex  solver queries which could drastically impact the overall build times.
+	This issue was already explored in the original paper \cite{liu24:minotaur}.
+	
 	An example of all the steps applied sequentially to an example input is shown in figure \ref{fig:canon_full}
 
+	\input{all_steps_example.tex}
+
+	\paragraph{Replacing Greater-Than with Less-Than}
+	A single comparison operation often has multiple semantically equivalent ways of being expressed.
+	To address this we replace every greater-than or greater-equal comparison with a less-than or less-equal comparison respectively.
+	For correctness we also have to swap the order of operands.
+	\begin{align*}
+		\forall x \forall y . (x\ P\ y \iff y\ P'\ x) \\
+		with (P, P') \in {(>, <), (\geq, \leq)}
+	\end{align*}
+	This reduces the size of the key space since now only less-than and less-equal comparisons are performed.
+	It also does not change the depth of the function.
+
+	\paragraph{Non-strict Operator Replacement}
+	The idea is to reduce the number of comparison operators that are available in order to decrease the number of possible way to express a comparison operation.
+	This is done by replacing non-strict comparison operators like $\leq$ with $<$.
+	To introduce additional operations this is only done when a constant is one of the operands.
+	This constant is then adjusted accordingly if no prevented by an edge case like the constant being already the maximum or minimum value possible for the data type.
+	So given some expression like $ x \leq c$ it would be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment possible for $c$.
+	% TODO: under which structure does this hold
+	% TODO: define structure/theory?
+	% TODO: explain further for floating point types
+	\[
+		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
+	\]
+	An analogous argument can be made for the $\geq$ and for a swapped operands and works for both integral and floating point types.
+	Currently vector types are filtered.
+
 	\paragraph{Elimination of Unused Function Arguments}
-	% TODO add example of the step applied to llvm code
 	Some function have unused arguments.
 	% TODO explain how values are represented in the cache so the last part of this sentence makes sense
 	Those can simply be eliminated during the forward pass.
@@ -216,7 +238,6 @@
 	Due to the implicit nature of the function signature in the values of the cache and the structure of Minotaur no additional work is required in relation to this step.
 
 	\paragraph{Sorting of Function Arguments}
-	% TODO add example of the step applied to llvm code
 	Another modification that is done to the function signature is that we sort the arguments.
 	The arguments are sorted by type-name and internally by when they are used inside the function body.
 	Sorting by the type name is done in order to avoid cases where the function body is the same but a cache miss occurs due to the order of the types being different.
@@ -234,122 +255,54 @@
 	Similar to the elimination of unused arguments no further work is required.
 
 	\paragraph{Renaming of Function Arguments}
-	% TODO add example of the step applied to llvm code
-
-	\paragraph{Replacing Greater-Than with Less-Than}
-	% TODO add example of the step applied to llvm code
-
-	\paragraph{Non-strict Operator Replacement}
-	% TODO add example of the step applied to llvm code
-	The idea is to reduce the number of comparison operators that are available.
-	This is done by replacing non-strict comparison operators like $\leq$ with $<$.
-	To introduce additional operations this is only done when a constant is one of the operants.
-	This constant is then adjusted accordingly if no prevented by an edge case like the constant being already the maximum or minimum value possible for the data type.
-	So given some expression like $ x \leq c$ it would be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment possible for $c$.
-	% TODO: under which structure does this hold
-	% TODO: define structure/theory?
-	% TODO: explain further for floating point types
-	\[
-		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
-	\]
-	An analogous argument can be made for the $\geq$ and for a swapped operands and works for both integral and floating point types.
-	Currently vector types are filtered.
-
-	\begin{figure*}[t]
-	\centering
-	\caption{\label{fig:canon_full} Example applying each canonicalization step.}
-	\begin{lstlisting}[language=llvm, escapechar=!]
-	input:
-		define i1 @cut(i32 %a, float %b, i32 %c, float %d) {
-			%1 = fcmp uge float %b, %d
-			%2 = icmp sle i32 %c, 15
-
-			%3 = and i1 %1, %2
-
-			ret i1 %3
-		}
-	\end{lstlisting}
-	\begin{lstlisting}[language=llvm, escapechar=!]
-	unused argument elimination:	
-		define i1 @cut !\colorbox{blue!50}{(float \%b, i32 \%c, float \%d)}! {
-			%1 = fcmp uge float %b, %d
-			%2 = icmp sle i32 %c, 15
-
-			%3 = and i1 %1, %2
-
-			ret i1 %3
-		}
-	\end{lstlisting}
-	\begin{lstlisting}[language=llvm]
-	replacing greater-than with less-than:	
-		define i1 @cut(float %b, i32 %c, float %d) {
-			%1 = fcmp ule float %d, %b
-			%2 = icmp sle i32 %c, 15
-
-			%3 = and i1 %1, %2
-
-			ret i1 %3
-		}
-	\end{lstlisting}
-	\begin{lstlisting}[language=llvm]
-	replacing non-strict operators:	
-		define i1 @cut(float %b, i32 %c, float %d) {
-			%1 = fcmp ule float %d, %b
-			%2 = icmp slt i32 %c, 16
-
-			%3 = and i1 %1, %2
-
-			ret i1 %3
-		}
-	\end{lstlisting}
-	\begin{lstlisting}[language=llvm]
-	argument sorting:	
-		define i1 @cut(float %d, float %b, i32 %c) {
-			%1 = fcmp uge float %d, %b
-			%2 = icmp sle i32 %c, 15
-
-			%3 = and i1 %1, %2
-
-			ret i1 %3
-		}
-	\end{lstlisting}
-	\begin{lstlisting}[language=llvm]
-	argument renaming:	
-		define i1 @cut(float %__canonArg, float %__canonArg1,
-			i32 %__canonArg2, i32 %__canonArg3) {
-			%1 = fcmp uge float %__canonArg, %__canonArg1
-			%2 = icmp sge i32 %__canonArg2, %__canonArg3
-		}
-	\end{lstlisting}
-	
- 	\end{figure*}
-
 
 	\subsection{Ordering of the Canonicalization Steps \label{sec:ordering}}
 	% Describe the order in which the steps are applied and explain why
 	% first greater... to less... change then argument ordering then argument renaming
 
+	It is important to order the canonicalization-steps such that they do not interfere with previous once.
+	In our case this is still relatively simple since we only have two constraints.
+
+	First, the argument renaming step should be run after the last modification to functions arguments.
+	In our case this implies that it has to run after the elimination of unused arguments step and after the argument sorting step.
+
+	Second, the sorting of function arguments has to take place after the last modification to the function body in which the usage order of the arguments is changed.
+	This means concretely that it has to be run after the step replacing greater than with less than operators.
+
+	Based on those two constraints we can define the following order:
+
+	\begin{enumerate}
+		\item Replacing Greater-Than with Less-Than
+		\item Non-strict Operator Replacement
+		\item Elimination of unused Function Arguments
+		\item Sorting of Function Arguments
+		\item Renaming of Function Arguments
+	\end{enumerate}
+	
 	\subsection{Issues with the original version}
 	% Some of the debugging we did in the mean time.
 
 	% TODO describe the order of the steps
+	% TODO consider not adding this due to space constraints
 
 	\section{Evaluation}
 	\subsection{Setup}
+	% hardware and general setup of the tests
+	For the evaluation we used an AMD Ryzen 9 5900 CPU which has 12 cores running at up to 4.8 GHz .
 
-	% Experimental setup and methodology.
-	% hardware and software selection for benchmarking
-	% how we got our baseline measurements
+	% what was done for each benchmark run
+	Each benchmarked program was build once using Minotaur with canonicalization disabled and once with canonicalization enabled.
+	Since our canonicalization steps are compositional we measured the effect each step and combination of steps have.
+	Furthermore, we ran the provided tests and benchmarked each compiled program.
+
+	% what was benchmarked and why
+	We chose to benchmark libgmp-6.2.1 as the original paper did.
+	Due to the long compile times experienced on libYUV, we decided against benchmarking it, like the original paper did, and instead opted to select different smaller projects.
+	% TODO: mention the other projects that were benchmarked
 
 	\subsection{Results}
 	% Evaluation results
 	% just the results no interpretation
-
-	The key metrics which measured for the following benchmarks were the cache size, cache hit rate, number of applied rewrites and solver time.
-	Since our canonicalization steps are compositional we measure the impact of each step and combination of steps.
-	% might not make sense depending on which steps are actually implemented
-	We also tested changing the order of canonicalization steps where possible and measured the effect.
-	Furthermore, we measure the total compilation time for several select software projects.
 
 	\section{Discussion}
 	% Key findings
