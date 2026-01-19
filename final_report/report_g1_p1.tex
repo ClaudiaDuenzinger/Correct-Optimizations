@@ -274,33 +274,46 @@
 	
 	\paragraph{Replacing Greater-Than with Less-Than}
 	% explanation
-	A comparison operation often has multiple semantically equivalent ways of being expressed.
-	To address this we replace every greater-than or greater-equal comparison with a less-than or less-equal comparison respectively and then swap the order of operands.
+	Comparison operations often have multiple semantically equivalent ways of being expressed.
+	To address this every greater-than or greater-equal comparison is replaced with a less-than or less-equal comparison respectively and the operands are swapped.
 	% reduced key space
 	This reduces the size of the key space since now only less-than and less-equal comparisons are possible.
 	% correctness
+	The correctness of the transformation follows from the "lemma" below.
 	\begin{align*}
 		\forall x \forall y . (x\ P\ y \iff y\ P'\ x) \\
 		with (P, P') \in {(>, <), (\geq, \leq)}
 	\end{align*}
 	% de-canonicalization
+	For this transformation no de-canonicalization is needed.
 	% depth
-	It also does not change the depth of the function.
+	The depth is not impacted, since only the predicate of a comparison operator is modified.
 
 	\paragraph{Non-strict Operator Replacement}
-	The idea is to reduce the number of comparison operators that are available in order to decrease the number of possible way to express a comparison operation.
-	This is done by replacing non-strict comparison operators like $\leq$ with $<$.
-	To introduce additional operations this is only done when a constant is one of the operands.
-	This constant is then adjusted accordingly if no prevented by an edge case like the constant being already the maximum or minimum value possible for the data type.
-	So given some expression like $ x \leq c$ it would be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment possible for $c$.
-	% TODO: under which structure does this hold
-	% TODO: define structure/theory?
-	% TODO: explain further for floating point types
+	% explanation
+	This transformation replaces non-strict comparison operators with strict ones whenever possible, subject to certain constraints.
+	% depth
+	The replacement is applied only when the comparison involves constant operands, ensuring that the depth remains unchanged and that no additional operations are introduced.
+	% reduced key space
+	By reducing the number of distinct ways to express equivalent comparisons, this transformation shrinks the key space.
+	%correctness
+	Each value of LLVM's build-in integral and floating-point types represents a specific real number, with the exception of the special values $NaN$ and $+- \inf$.
+	The real numbers form a total order; consequently, the set of all non-special values of each type also forms a total order.
+	For floating-point types, this order can be extended by defining $- \inf$ as the minimum element and $+ \inf$ as the maximum element.
+	Within a total order each value, with the exception of the minimum and maximum, have a greater and smaller neighbor.
+
+	In a total order, every value—except for the minimum and maximum—has both an immediate predecessor and an immediate successor.
+	The minimum has only a successor, and the maximum has only a predecessor.
+	Due to this property, non-strict comparison operators can be replaced by strict ones by appropriately adjusting a constant operand, provided that a suitable neighboring value exists.
+
+	For example, given an expression of the form $ x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment for $c$.
+	Formally:
 	\[
 		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
 	\]
-	An analogous argument can be made for the $\geq$ and for a swapped operands and works for both integral and floating point types.
-	Currently vector types are filtered.
+	Similar arguments can be made for the $\geq$ and for cases where the constant appears on the left-hand side of the comparison.
+	% de-canonicalization
+	No de-canonicalization is required for this transformation.
 
 	\subsection{Ordering of the Canonicalization Steps \label{sec:ordering}}
 	% Describe the order in which the steps are applied and explain why
@@ -326,10 +339,8 @@
 	\end{enumerate}
 	
 	% \subsection{Issues with the original version}
-	% Some of the debugging we did in the mean time.
-
-	% TODO describe the order of the steps
 	% TODO consider not adding this due to space constraints
+	% Some of the debugging we did in the mean time.
 
 	\section{Evaluation}
 	\subsection{Setup}
@@ -355,14 +366,13 @@
 	% Key findings
 	% interpretation/explanation of the results
 
-	\section{Future Work}
-	% perform load ordering so between loads and also where to load data in a function e.g. at the beginning or end
-	% use transitivity of equivalence to find more possible optimizations LLVM_IR_1- > Rewrite_1 and LLVM_IR_2 -> Rewrite_1 since both are equiv to the same rewrite they are also equiv and due to minotaur trying to find the fastest solutions two results mapping to the same thing might be somewhat likely
-	%
-	% other ideas of making minotaur faster are pgo and to not start with the very short slices as minotaur does 1 ... depth limit in the slicer
-
 	\section{Conclusion}
 	% did it work, what issues are remaining, future work
+
+	To further improve our approach, one could attempt to perform a more structured search for additional transformations by finding syntactically equivalent rewrites in the cache and looking at their respective keys to come up with new transformations.
+	% perform load ordering so between loads and also where to load data in a function e.g. at the beginning or end
+	%
+	% other ideas of making minotaur faster are pgo and to not start with the very short slices as minotaur does 1 ... depth limit in the slicer
  	
 	\printbibliography
  	
