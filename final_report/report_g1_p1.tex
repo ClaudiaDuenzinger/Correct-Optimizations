@@ -69,6 +69,7 @@
 }
  \usepackage{amsmath}
  \usepackage{listings}
+ \usepackage{enumitem}
 
  \usepackage[acronym]{glossaries}
  \makeglossaries 
@@ -330,7 +331,7 @@
 
 	Based on those two constraints we can define the following order:
 
-	\begin{enumerate}
+	\begin{enumerate}[noitemsep, topsep=0pt, leftmargin=*]
 		\item Elimination of unused Function Arguments
 		\item Replacing Greater-Than with Less-Than
 		\item Non-strict Operator Replacement
