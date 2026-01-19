@@ -238,13 +238,14 @@
 	% reduced key space
 	This defines a total order of function arguments for each function body and reduces the size of the key space.
 	%correctness
-	To show the correctness of this transformation we define $f: T_1 \times ... \times T_n \to R$ as the input function and $f': T_{\rho{(1)}} \times ... \times T_{\rho{(n)}} \to R$ the output function with $\rho: [n] \to [n]$ being a bijective function i.e. a permutation.
-	We define 
-	\begin{align*}
-		f'(t_{\rho{(1)}}, ..., t_{\rho{(n)}}) &:= f(t_{\rho^{-1}{(\rho{(1)})}}, ..., t_{\rho^{-1}{(\rho{(n)})}}) \\
-										  &= f(t_1, ..., t_n), t_i \in T_i \\ 
-	\end{align*}
-	This clearly shows that $f$ and $f'$ compute the same for all inputs.
+
+	Let $f: T_1 \times ... \times T_n \to R$ be an input function and $f'$ the output function with reordered parameters according to permutation $\rho: [n] \to [n]$.
+    Both functions accept the same set of arguments, just in different positions.
+    For any input tuple $(t_1, ..., t_n)$, the function body computes the same result regardless of parameter order because the body operates on argument values, not their positional indices:
+    \[
+        f(t_1, ..., t_n) = f'(t_{\rho^{-1}(1)}, ..., t_{\rho^{-1}(n)}) = \text{body}(t_1, ..., t_n)
+    \]
+    Thus parameter reordering does not affect semantic equivalence.
 	% de-canonicalization
 	Because Minotaur maintains a mapping between the extracted functions arguments and the original code the snippet was extracted from, we can simply update this mapping and do not require explicit de-canonicalization.
 	% depth
