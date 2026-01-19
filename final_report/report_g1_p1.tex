@@ -115,19 +115,20 @@
  	\section{Introduction}
 	% What is the problem?
 	% Why is it important or interesting?
-	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches those in a data base.
-	For this pourpuse it uses the original code as the key to find a rewrite/optimization which is the value.
+	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches them in a database.
+	For this purpose, it uses original code segments as keys to find rewrites/optimizations, which are stored as values.
 	The intention behind the caching is to speedup the substantial runtimes of Minotaur for future compilations of the same or similar programs.
-	Minotaurs compile times, with a cold cache, can easily be hundreds of times slower than with regular LLVM \cite{liu24:minotaur}.
+	Minotaur's compile times, with a cold cache, can easily be hundreds of times slower than with regular LLVM \cite{liu24:minotaur}.
 	
 	% What is the state-of-the-art? What is the research-gap?
 	% Current state in Minotuar
-	Currently Minotaur directly uses the extracted LLVM IR code segments as the keys and stores those along side a rewrite, in Minotaurs own IR, as values in the cache.
+	Currently, Minotaur uses extracted LLVM IR code segments directly as cache keys, storing them alongside rewrites in Minotaur's own IR as values.
 	An example for a key-value pair is shown in figure \ref{fig:kv}.
 
 	\input{kv_example.tex}
 
-	This approach, of directly using the extracted code segments, can easily lead to near misses, where an equivalent code segment is already cached, but for instance has unused arguments, leading to a cache miss and a costly recompute of an optimization.
+	This approach can lead to cache misses because semantically equivalent code segments may have different signatures.
+	For example, if a cached segment has unused arguments while the current segment does not, the cache lookup fails and triggers a costly recomputation.
 	% To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
 
 	% Why is it difficult? What are the challenges?
@@ -145,7 +146,7 @@
 	% What are the key insights?
 	% What are novel aspects?
 	The idea is that this leads to fewer cache entries, an increased cache hit rate and fewer slow optimization searches by Minotaur.
-	For large enough projects this can already take effect during an initial build, even when starting with an empty cache and thereby reducing the compile time.
+	For large enough projects this can already take effect during an initial build, even when starting with an empty cache and thereby reduce the compile time.
 
 	\section{Canonicalization}
 	% TODO explain what is meant by equivalence or refer to a later text position
@@ -164,8 +165,8 @@
 	% How did you design and implement the system?
 	Our extension is placed as a pre- and postprocessing step around Minotaurs inference step.
 	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a modified version of the input, which is then forwarded to the inference step.
-	In the following this set transformations is called canonicalization.
-	After the inference step is done and returns a rewrite in Minotaurs own IR, another set of transformations on the rewrite, is performed.
+	In the following this set of transformations is called canonicalization.
+	After the inference step is done and returns a rewrite in Minotaur's own IR, another set of transformations on the rewrite is performed.
 	This process is called de-canonicalization from now on.
 	Figure \ref{fig:architecture} gives an overview of how our extension integrates into Minotuar.	
 
@@ -176,7 +177,7 @@
 	More on that is discussed in section \ref{sec:ordering}.
 	During the canonicalization process every canonicalization function is applied iteratively in this predefined order.
 	% TODO: talk about why we need the reverse order
-	For de-canonicalization the de-canonicalization functions are applied in the reverse order in which the canonicalization-steps are specified.
+	For de-canonicalization, the de-canonicalization functions are applied in the reverse order in which the canonicalization steps are specified.
 	It is also possible to pass information between the pairs of canonicalization and de-canonicalization functions of each step if required.
 	This enables the support for more complex transformations.
 
@@ -186,7 +187,7 @@
 
 	\begin{figure*}[t]
 		\begin{center}
-			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated. The highlighted blocks were added for (De-)Canonicalization.}
+			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated. The highlighted blocks were added for \mbox{(De-)Canonicalization.}}
 			\input{architecture.tex}
 		\end{center}
 	\end{figure*}
@@ -239,7 +240,7 @@
 	Another modification that is done to the function signature is that the function arguments are sorted.
 	The arguments are sorted by their type-name and internally each set of arguments of the same type is sorted by when they are used inside the function body.
 	% reduced key space
-	This defines a total order of function arguments for each function body and reducing the size of the key space.
+	This defines a total order of function arguments for each function body and reduces the size of the key space.
 	%correctness
 	To show the correctness of this transformation we define $f: T_1 \times ... \times T_n \to R$ as the input function and $f': T_{\rho{(1)}} \times ... \times T_{\rho{(n)}} \to R$ the output function with $\rho: [n] \to [n]$ being a bijective function i.e. a permutation.
 	We define 
@@ -319,7 +320,7 @@
 	% Describe the order in which the steps are applied and explain why
 	% first greater... to less... change then argument ordering then argument renaming
 
-	It is important to order the canonicalization-steps such that they do not interfere with previous once.
+	It is important to order the canonicalization-steps such that they do not interfere with previous ones.
 	In our case this is still relatively simple since we only have two constraints.
 
 	First, the argument renaming step should be run after the last modification to functions arguments.
@@ -346,10 +347,10 @@
 	\subsection{Setup}
 	% hardware and general setup of the tests
 	For the evaluation we used an AMD Ryzen 9 5900 CPU which has 12 cores running at up to 4.8 GHz.
-	All benchmarks were build using the $-O3$ and $-march=native$ flags.
+	All benchmarks were built using the $-O3$ and $-march=native$ flags.
 
 	% what was done for each benchmark run
-	Each benchmarked program was build once using Minotaur with canonicalization disabled and once with canonicalization enabled.
+	Each benchmarked program was built once using Minotaur with canonicalization disabled and once with canonicalization enabled.
 	Since our canonicalization steps are compositional we measured the effect each step and combination of steps have.
 	Furthermore, we ran the provided tests and benchmarked each compiled program.
 
