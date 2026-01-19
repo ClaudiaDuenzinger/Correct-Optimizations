@@ -163,7 +163,7 @@
 	Because Minotaur only generates slices up to a fixed depth, it is possible to achieve finite equivalence classes with a transformation normalizing the names in a code snippet.
 
 	% How did you design and implement the system?
-	Our extension is placed as a pre- and postprocessing step around Minotaurs inference step.
+	Our extension is placed as a pre- and postprocessing step around Minotaur's inference step.
 	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a modified version of the input, which is then forwarded to the inference step.
 	In the following this set of transformations is called canonicalization.
 	After the inference step is done and returns a rewrite in Minotaur's own IR, another set of transformations on the rewrite is performed.
@@ -202,7 +202,7 @@
 	%The depth is kept constant as increasing this has a large impact on runtime as shown in original paper \cite{liu24:minotaur}.
 
 	% TODO: consider reducing the length of this paragraph by focusing only on why these properties where chosen and leave the rest for future work
-	It might be possible to relax the correctness property, to, for instance, allow the reordering of memory operations depending on the memory model.
+	It might be possible to relax the correctness property to, for instance, allow the reordering of memory operations depending on the memory model.
 	Similarly, the requirement of reducing the size of the key space could be relaxed such that it only holds over all steps but not for every individual step.
 	Also, the depth constraint is not strictly required and could be dropped, but this would likely result in more complex  solver queries which could drastically impact the overall runtime of Minotaur and offset any benefit gained from using canonicalization.
 	This link between depth and runtime was already explored in the original paper \cite{liu24:minotaur}.
@@ -218,17 +218,13 @@
 	By removing those the number of functions with the same body but different signatures are reduced.
 	Thereby reducing the size of the key space.
 	% correctness
-	Assuming the given input function $f$ has an unused argument we can define the following.
-	Let $f: T_1 \times ... \times T_i \times ... \times T_n \to R$ and $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ be $n$-ary and $n-1$-ary functions respectively with
+	Let $f: T_1 \times ... \times T_n \to R$ be an extracted function where argument $t_i$ does not appear in the body of $f$.
+	We can then define $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ where
 	\[
-		f(t_1, ..., t_n) := g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n), t_j \in T_j
+		\forall t_1 \in T_1, ..., t_n \in T_n: f(t_1, ..., t_n) = g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n)
 	\]
-	Since $t_i$ is not part of the function signature of $g$ we can define a new function $f' := g$.
-	This obviously does not change what is computed since
-	\begin{align*}
-		f(t_1, ..., t_n) &= g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n) \\
-						 &= f'(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n)
-	\end{align*}
+	This equality holds because $t_i$ does not affect the computation in $f$'s body.
+	Setting the canonicalization $f' := g$, we obtain the same result for all valid inputs.
 	% de-canonicalization
 	As shown in figure \ref{fig:kv} the rewrite does not have an explicit function signature.
 	Therefore no de-canonicalization is required.
@@ -298,21 +294,21 @@
 	% reduced key space
 	By reducing the number of distinct ways to express equivalent comparisons, this transformation shrinks the key space.
 	%correctness
-	Each value of LLVM's build-in integral and floating-point types represents a specific real number, with the exception of the special values $NaN$ and $+- \inf$.
+	Each value of LLVM's built-in integral and floating-point types represents a specific real number, with the exception of the special values $NaN$ and $\pm \inf$.
 	The real numbers form a total order; consequently, the set of all non-special values of each type also forms a total order.
 	For floating-point types, this order can be extended by defining $- \inf$ as the minimum element and $+ \inf$ as the maximum element.
 	Within a total order each value, with the exception of the minimum and maximum, have a greater and smaller neighbor.
 
-	In a total order, every value—except for the minimum and maximum—has both an immediate predecessor and an immediate successor.
-	The minimum has only a successor, and the maximum has only a predecessor.
+	In a total order, every value except for the minimum and maximum has both an immediate predecessor and an immediate successor.
+	The minimum only has a successor, and the maximum only has a predecessor.
 	Due to this property, non-strict comparison operators can be replaced by strict ones by appropriately adjusting a constant operand, provided that a suitable neighboring value exists.
 
-	For example, given an expression of the form $ x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $ x < c + \epsilon$ where $\epsilon$ is the smallest possible increment for $c$.
+	For example, given an expression of the form $x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $x < c + \epsilon(c)$ where $\epsilon(c)$ is the smallest representable increment at $c$ (e.g., $1$ for integers).
 	Formally:
 	\[
-		\exists v \exists \epsilon \forall x . (( v = c + \epsilon) \implies (x \leq c \iff  x < c + \epsilon))
+		\forall x . (x \leq c \iff x < c + \epsilon(c))
 	\]
-	Similar arguments can be made for the $\geq$ and for cases where the constant appears on the left-hand side of the comparison.
+	Similar arguments apply for $\geq$ and for cases where the constant appears on the left-hand side of the comparison.
 	% de-canonicalization
 	No de-canonicalization is required for this transformation.
 
