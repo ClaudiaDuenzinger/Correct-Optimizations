@@ -342,9 +342,13 @@
 
 	\section{Evaluation}
 	\subsection{Setup}
+	% TODO: fix this part based on what is in the final report
 	% hardware and general setup of the tests
 	For the evaluation we used an AMD Ryzen 9 5900 CPU which has 12 cores running at up to 4.8 GHz.
 	All benchmarks were built using the $-O3$ and $-march=native$ flags.
+	The authors of Minotaur updated their code since our original attempt to reproduce their results.
+	% TODO remove the foot note to save space
+	We based our evaluation on the latest version of Minotaur \footnote{\href{https://github.com/minotaur-toolkit/minotaur/tree/d372e6dd903045fcb0461a74633634470f6b157c}{Updated Minotaur Version}} that did not include any new features but all the available bug fixes.
 
 	% what was done for each benchmark run
 	Each benchmarked program was built once using Minotaur with canonicalization disabled and once with canonicalization enabled.
@@ -352,7 +356,7 @@
 	Furthermore, we ran the provided tests and benchmarked each compiled program.
 
 	% what was benchmarked and why
-	We chose to benchmark libgmp-6.2.1 as the original paper did.
+	We chose to benchmark libgmp-6.2.1 as the original paper did \cite{liu24:minotaur}.
 	Due to the long compile times experienced on libYUV, we decided against benchmarking it, like the original paper did, and instead opted to select different smaller projects.
 	% TODO: mention the other projects that were benchmarked
 
@@ -360,9 +364,60 @@
 	% Evaluation results
 	% just the results no interpretation
 
+	Building libgmp using our augmented version of Minotaur showed a speedup of 1.31x compared to regular Minotaur.
+	This can also be seen in the bottom graph of figure \ref{fig:cache} which is why the orange plots stop earlier.
+	In this graph it can also be seen that the respective curves have a similar shape but are shifted on the time axis.
+	Overall, our canonicalizations only added 5.68 seconds of total CPU time for the build of libgmp.
+
+	The overall cache size using our augmented version was only 78.3\% of the cache size of regular Minotaur which was 17734 key value pairs.
+	When looking at figure \ref{fig:cache} it can be seen that the overall number of queries was quite similar.
+	In comparison, the number of cache hits for our augmented version was 12.7\% higher and lead to 67.7\% cache hit rate, while regular Minotaur only achieved 59.2\%.
+	This is also reflected in the 28.6\% higher number of solver invocations by regular Minotaur.
+	When it takes to long to find a beneficial rewrite it times out.
+	Our extended version shows a slightly lower number of timeouts relative to the total number of solver invocations of 25.1\% compared to 27.2\% compared to regular Minotaur.
+	When looking at queries that were a cache hit where the cached key also has a solution associated with it, which is denoted as $sol$ in figure \ref{fig:cache}, we can see that this increased by 50\% for our solution.
+	% TODO: consider using % time faster not speedup doe to the sentence structure
+	Importantly, similar improvements were also measured in the total CPU time it took to build libgmp, where a speedup of 1.37x was observed.
+	
+	\begin{figure*}
+	\centering
+	\caption{\label{fig:cache}
+	Shows the comparison of cache metrics collected during the compilation of libgmp by the unmodified version of Minotaur (baseline in blue) and the extended version of Minotaur (canon in orange).
+	The top row shows the total number of queries (queries), cache hits (hits), calls to the solver after a cache miss (solver\_calls), solver timeouts (timeouts), rewrites successfully queried from the cache (sols) and the time spend in the solver (total\_solver\_time) over all build units.
+	}
+	\includegraphics[width=0.7\textwidth]{images/Figure_1.png}
+	\end{figure*}
+	
+	As mentioned earlier we used a updated version of Minotaur including new bug fixes.
+	The tests included by libgmp were run and  passed for both regular Minotaur and our extended version.
+
+	% TODO: consider removing this paragraph or at least the first two sentences
+	In addition to building libgmp using Minotaur we also build it using standard llvm.
+	When comparing the results from running the benchmark between standard LLVM and Minotaur we got the same inconclusive results as in our last report i.e. that Minotaur does not improve nor degrade the performance.
+	When comparing the results from running the benchmark between regular Minotaur and our extended version there is almost no difference across all measured values.
+
+	% \begin{figure*}
+	% \centering
+	% \caption{\label{fig:llvm_canon_perf}}
+	% \includegraphics[width=\textwidth]{images/Figure_llvm_canon_gmp.png}
+	% \end{figure*}
+	% \begin{figure*}
+	% \centering
+	% \caption{\label{fig:baseline_canon_perf}}
+	% \includegraphics[width=\textwidth]{images/Figure_baseline_canon_gmp.png}
+	% \end{figure*}
+
 	\section{Discussion}
 	% Key findings
 	% interpretation/explanation of the results
+
+	The speedup measured by our extension is caused by the increase in the cache hit rate which leads to fewer long running solver invocations, fulfilling the main goal of our proposed solution.
+	This was achieved even though only very simple transformations were applied.
+
+	The different number of queries, which can be observed in figure \ref{fig:cache}, are also present between two runs of regular Minotaur.
+	It is not clear if this is caused by LLVM producing different LLVM IR between runs or if it is caused by Minotaur.
+
+	That the tests of libgmp pass indicates, that our canonicalization step maintains the sematics of the keys, therefore being correct.
 
 	\section{Conclusion}
 	% did it work, what issues are remaining, future work
