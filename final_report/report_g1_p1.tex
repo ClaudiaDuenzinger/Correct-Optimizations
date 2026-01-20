@@ -79,7 +79,7 @@
  	\date{}
  	
  	% make title bold and 14 pt font (Latex default is non-bold, 16 pt)
- 	\title{\Large \bf Correct Optimizations: Phase 2 Report Based on \citetitle{liu24:minotaur} \cite{liu24:minotaur}}
+ 	\title{\Large \bf  Correct Optimizations: Phase 2 Report Based on \citetitle{liu24:minotaur} \cite{liu24:minotaur}}
  	
  	%for single author (just remove % characters)
  	\author{
@@ -105,7 +105,7 @@
  	\section{Introduction}
 	% What is the problem?
 	% Why is it important or interesting?
-	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches them in a database.
+	Minotaur \cite{liu24:minotaur} is a superoptimizer that, after computing optimizations, caches them in a database.
 	For this purpose, it uses the original code segment as a key to find a rewrite/optimization, which is stored as the value of the key value pair.
 	The intention behind the caching is to speedup the substantial runtimes of Minotaur for future compilations of the same or similar programs.
 	Minotaur's compile times, with a cold cache, can easily be hundreds of times slower than with regular LLVM \cite{liu24:minotaur}.
@@ -115,7 +115,7 @@
 	Currently, Minotaur uses its extracted LLVM IR code segments directly as cache-keys, storing them alongside rewrites, in Minotaur's own IR, as values.
 	An example for a key-value pair is shown in Figure \ref{fig:canon_full}.
 
-	This approach can easily lead to avoidable cache misses because semantically equivalent code segments can have different keys.
+	This approach can cause avoidable cache misses because semantically equivalent code segments can have different keys.
 	For example, if a cached segment has unused arguments while the current segment does not, the cache lookup fails and triggers a costly optimization search by Minotaur's solver.
 	% To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
 
@@ -134,14 +134,14 @@
 	% What are the key insights?
 	% What are novel aspects?
 	The idea is that this leads to fewer cache entries, an increased cache hit rate and fewer slow optimization searches by Minotaur.
-	For large enough projects this can already take effect during an initial build, even when starting with an empty cache, thereby reduce the compile time.
+	For large enough projects this can already take effect during an initial build, even when starting with an empty cache, thereby reducing compile time.
 
 	\section{Canonicalization}
 	% TODO explain what is meant by equivalence or refer to a later text position
 	To motivate the idea of canonicalization we start by defining the set of all valid LLVM IR snippets and call it the key space.
 	The key space consists of equivalence classes of semantically equivalent keys, partitioning the key space.
 	We call a set that contains one representative of each equivalence class a canonical key space.
-	An ideal canonicalization transformation would map each input LLVM IR snippet to its representative in a canonical key space.
+	An ideal canonicalization transformation would map each LLVM IR input snippet to its representative in a canonical key space.
 	Using such a transformation would enable reaching the optimal cache hit rate and avoid unnecessary expensive optimization searches by Minotaur, since there would be no cache misses anymore where an equivalent snippet has already been processed.
 
 	% TODO: think about how hard this is i.e. np-hard or not even computable
@@ -151,7 +151,7 @@
 	Because Minotaur only generates slices up to a fixed depth, it is possible to achieve finite equivalence classes with a transformation normalizing the names in a code snippet.
 
 	% How did you design and implement the system?
-	Our extension is placed as a pre- and postprocessing step around Minotaur's inference step.
+	Our extension is placed as a pre-/postprocessing step around Minotaur's inference step.
 	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a modified version of the input, which is then forwarded to the inference step.
 	In the following this set of transformations is also called canonicalization.
 	After the inference step is done and returns a rewrite in Minotaur's own IR, another set of transformations on the rewrite is performed.
@@ -184,7 +184,7 @@
 	% TODO: explain why we can limit our reasoning to a function for correctness instead of having to reason over the hole code snippet
 	% TODO: explain what the depth of function is maybe just cite the original paper for that "as defined by cite..."
 	In the following each canonicalization-step is described.
-	They were selected such that each step maintains semantical equivalence, reduces the size of the key space and that it does not modify the code snippets depth.
+	They were selected such that each step maintains semantical equivalence, reduces the size of the key space and does not modify the code snippet's depth.
 	Here two code snippets are considered equivalent if they compute the same value and have the same effects on memory, including ordering of changes during execution, when using the same arguments.
 	These three properties are shown for each canonicalization-step.
 	%The depth is kept constant as increasing this has a large impact on runtime as shown in original paper \cite{liu24:minotaur}.
@@ -206,87 +206,74 @@
 	% reduced key space
 	By removing those the number of functions with the same body but different signatures are reduced.
 	Thereby decreasing the size of the key space.
-
-	% correctness
-	Let $f: T_1 \times ... \times T_n \to R$ be an extracted function where argument $t_i$ does not appear in the body of $f$.
-	We can then define $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ where
+	% correctness	
+	Assuming the given input function $f$ has an unused argument we can define the following.
+	Let $f: T_1 \times ... \times T_i \times ... \times T_n \to R$ and $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ be $n$-ary and $n-1$-ary functions respectively with
 	\[
-		\forall t_1 \in T_1, ..., t_n \in T_n: f(t_1, ..., t_n) = g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n)
+		f(t_1, ..., t_n) := g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n), t_j \in T_j
 	\]
-	This equality holds because $t_i$ does not affect the computation in $f$'s body.
-	Setting the canonicalization $f' := g$, we obtain the same result for all valid inputs.
-
+	Since $t_i$ is not part of the function signature of $g$ we can define a new function $f' := g$.
+	This obviously does not change what is computed since
+	\begin{align*}
+		f(t_1, ..., t_n) &= g(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n) \\
+						 &= f'(t_1, ..., t_{i-1}, t_{i+1}, ..., t_n)
+	\end{align*}	
 	% de-canonicalization
-	As shown in Figure \ref{fig:canon_full} the rewrite does not have an explicit function signature.
-	Therefore no de-canonicalization is required.
-
+	As shown in Figure \ref{fig:canon_full} the rewrite does not have an explicit function signature, making de-canonicalization unnecessary.
 	% depth
 	Modifying the function signature has no impact on the depth of the given code snippet.
 
 	\paragraph{Sorting of Function Arguments}
 	% explanation
-	Another modification that is done to the function signature is that the function arguments are sorted.
+	Another modification done to the function signature is the sorting of its arguments.
 	The arguments are sorted by their type-name and internally each set of arguments of the same type is sorted by when they are used inside the function body.
-
 	% reduced key space
 	This defines a total order of function arguments for each function body and reduces the size of the key space.
-
 	%correctness
 	Let $f: T_1 \times ... \times T_n \to R$ be an input function and $f'$ the output function with reordered parameters according to permutation $\rho: [n] \to [n]$.
-    Both functions accept the same set of arguments, just in different positions.
     For any input tuple $(t_1, ..., t_n)$, the function body computes the same result regardless of parameter order because the body operates on argument values, not their positional indices:
     \[
-        f(t_1, ..., t_n) = f'(t_{\rho^{-1}(1)}, ..., t_{\rho^{-1}(n)}) = \text{body}(t_1, ..., t_n)
+        f(t_1, ..., t_n) = f'(t_{\rho(1)}, ..., t_{\rho^(n)}) = \text{body}(t_1, ..., t_n)
     \]
     Thus parameter reordering does not affect semantic equivalence.
-
 	% de-canonicalization
 	Because Minotaur maintains a mapping between the extracted functions arguments and the original code the snippet was extracted from, we can simply update this mapping and do not require explicit de-canonicalization.
-
 	% depth
 	Since only the function signature is modified there is no change to the depth.
 
 	\paragraph{Renaming of Function Arguments}
-	% explanation
-	After the previous two transformations the signature is almost unique for each function body with the exception of the naming.
-	To resolve this each argument is renamed depending on its position in the signature.
-
+	% explanation	
+	After the previous two transformations, the signature is nearly unique for each function body except for naming.
+	To address this, each argument is renamed based on its position in the signature.
+	
 	% reduced key space
-	Because now the names of all function arguments are defined by their position all functions with a given signature and body map to the same key.
-
+	Because now the names of all function arguments are defined by their position, all functions with a given signature and body map to the same key.
 	% correctness
-	Given a function $f(t_1, ..., t_n) := g(t_1, ..., t_n)$ as the input to the transformation step and a function $f'(x_1, ..., x_n) := g(x_1, ..., x_n)$ as the output.
-	If we apply $f$ and $f'$ to the same set of arguments $v_i, i \in [n]$ we get
+	Given a function $f(t_1, ..., t_n) := g(t_1, ..., t_n)$ with body $g$ as the input to the transformation step and a function $f'(x_1, ..., x_n) := g(x_1, ..., x_n)$ as the output,  we apply $f$ and $f'$ to the same set of arguments $v_i, i \in [n]$ and get
 	\[
 		f(v_1, ..., v_n) = g(v_1, ...,v_n) = f'(v_1, ..., v_n)
 	\]
 	This shows that renaming the arguments does not change the result of the function.
-
 	% de-canonicalization
 	As mentioned previously, Minotaur maintains a mapping between the arguments of the extracted function and the original code snippet from which it was derived.
 	This mapping does not rely on names but instead uses references to objects that possess names, eliminating the need for de-canonicalization.
-	
 	% depth
 	Renaming does not impact the depth of the function.
 	
 	\paragraph{Replacing Greater-Than with Less-Than}
 	% explanation
 	Comparison operations often have multiple semantically equivalent ways of being expressed.
-	To address this every greater-than or greater-equal comparison is replaced with a less-than or less-equal comparison respectively and the operands are swapped.
+	To address this, every greater-than or greater-equal comparison is replaced with a less-than or less-equal comparison respectively and the operands are swapped.
 
 	% reduced key space
 	This reduces the size of the key space since now only less-than and less-equal comparisons are possible.
-
 	% correctness
-	The correctness of the transformation follows from the "lemma" below.
+	The correctness holds due to the following:
 	\begin{align*}
-		\forall x \forall y . (x\ P\ y \iff y\ P'\ x) \\
-		with (P, P') \in {(>, <), (\geq, \leq)}
+		\forall x \forall y . (x\ P\ y \iff y\ P'\ x) ,\ (P, P') \in \{(>, <), (\geq, \leq)\}
 	\end{align*}
-
 	% de-canonicalization
 	For this transformation no de-canonicalization is needed.
-
 	% depth
 	The depth is not impacted, since only the predicate of a comparison operator is modified.
 
@@ -296,27 +283,21 @@
 
 	% depth
 	The replacement is applied only when the comparison involves constant operands, ensuring that the depth remains unchanged and that no additional operations are introduced.
-
 	% reduced key space
 	By reducing the number of distinct ways to express equivalent comparisons, this transformation shrinks the key space.
-
 	%correctness
 	Each value of LLVM's built-in integral and floating-point types represents a specific real number, with the exception of the special values $NaN$ and $\pm \inf$.
 	The real numbers form a total order; consequently, the set of all non-special values of each type also forms a total order.
 	For floating-point types, this order can be extended by defining $- \inf$ as the minimum element and $+ \inf$ as the maximum element.
-	Within a total order each value, with the exception of the minimum and maximum, have a greater and smaller neighbor.
-
 	In a total order, every value except for the minimum and maximum has both an immediate predecessor and an immediate successor.
 	The minimum only has a successor, and the maximum only has a predecessor.
 	Due to this property, non-strict comparison operators can be replaced by strict ones by appropriately adjusting a constant operand, provided that a suitable neighboring value exists.
-
 	For example, given an expression of the form $x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $x < c + \epsilon(c)$ where $\epsilon(c)$ is the smallest representable increment at $c$ (e.g., $1$ for integers).
 	Formally:
 	\[
 		\forall x . (x \leq c \iff x < c + \epsilon(c))
 	\]
 	Similar arguments apply for $\geq$ and for cases where the constant appears on the left-hand side of the comparison.
-
 	% de-canonicalization
 	No de-canonicalization is required for this transformation.
 
@@ -327,12 +308,10 @@
 	It is important to order the canonicalization-steps such that they do not interfere with previous ones.
 	In our case this is still relatively simple since we only have two constraints.
 
-	First, the argument renaming step should be run after the last modification to functions arguments.
-	In our case this implies that it has to run after the elimination of unused arguments step and after the argument sorting step.
-
+	First, the argument renaming step should be run after the last modification to function arguments.
+	In our case this implies that it has to run after the elimination of unused arguments and after the argument sorting step.
 	Second, the sorting of function arguments has to take place after the last modification to the function body in which the usage order of the arguments is changed.
 	This means concretely that it has to be run after the step replacing greater than with less than operators.
-
 	The following order fulfills these constraints:
 
 	\begin{enumerate}[noitemsep, topsep=0pt, leftmargin=*]
@@ -351,19 +330,18 @@
 	% \subsection{Setup}
 	% TODO: fix this part based on what is in the final report
 	% hardware and general setup of the tests
-	For the evaluation we used an AMD Ryzen 9 5900 CPU which has 12 cores running at up to 4.8 GHz.
+	For the evaluation we used an AMD Ryzen 9 5900 CPU with 12 cores running at up to 4.8 GHz.
 	All benchmarks were built using the $-O3$ and $-march=native$ flags.
 	% TODO remove the foot note to save space
 	We based our evaluation on the latest version of Minotaur \footnote{\href{https://github.com/minotaur-toolkit/minotaur/tree/d372e6dd903045fcb0461a74633634470f6b157c}{Updated Minotaur Version}} that did not include any new features but all the available bug fixes.
 
 	% what was done for each benchmark run
-	The benchmark was built once using Minotaur with canonicalization module disabled and once with canonicalization module enabled.
-	Since our canonicalization steps are compositional we measured the effect each step and combination of steps have.
-	Furthermore, we ran the provided test and benchmark suite.
+	The benchmark was built once using Minotaur with the canonicalization module disabled and once with the canonicalization module enabled.
+	Next, we ran the provided test and benchmark suites.
 
 	% what was benchmarked and why
 	We chose to benchmark libgmp-6.2.1 as the original paper did \cite{liu24:minotaur}.
-	Due to generally long compile times of Minotaur, we decided against benchmarking additional code like libYUV, like the original paper did. %, and instead opted to select different smaller projects.
+	Due to generally long compile times of Minotaur, we decided against benchmarking additional code like libYUV, as in the original paper. %, and instead opted to select different smaller projects.
 	% TODO: mention the other projects that were benchmarked
 
 	\subsection{Results}
@@ -371,7 +349,7 @@
 	% just the results no interpretation
 
 	Building libgmp using our augmented version of Minotaur showed a speedup of 1.31x compared to regular Minotaur.
-	This can also be seen in the bottom graph of Figure \ref{fig:cache}, which is why the orange plots stop earlier.
+	This can be seen in the bottom graph of Figure \ref{fig:cache}, which is why the orange plots stop earlier.
 	In this graph it can also be seen that the respective curves have a similar shapes, but are shifted on the time axis.
 	Overall, our canonicalizations only added 5.68 seconds of total CPU time for the build of libgmp.
 
@@ -388,17 +366,17 @@
 	\begin{figure*}
 	\centering
 	\caption{\label{fig:cache}
-	Shows the comparison of cache metrics collected during the compilation of libgmp by the unmodified version of Minotaur (baseline in blue) and the extended version of Minotaur (canon in orange).
-	The top row shows the total number of queries (queries), cache hits (hits), calls to the solver after a cache miss (solver\_calls), solver timeouts (timeouts), rewrites successfully queried from the cache (sols) and the time spend in the solver (total\_solver\_time) over all build units.
+	Compares cache metrics collected during the compilation of libgmp using the unmodified Minotaur (baseline in blue) and the extended Minotaur (canon in orange).
+	The top row shows the total number of queries (queries), cache hits (hits), solver calls after cache misses (solver\_calls), solver timeouts (timeouts), rewrites successfully queried from the cache (sols), and time spent in the solver (total\_solver\_time) across all build units.	
 	}
 	\includegraphics[width=0.7\textwidth]{images/Figure_1.png}
 	\end{figure*}
 	
-	As mentioned earlier we used a updated version of Minotaur including new bug fixes.
-	The tests included by libgmp were run and  passed both for regular Minotaur and for our extended version.
+	As mentioned earlier we used an updated version of Minotaur including new bug fixes.
+	The tests included by libgmp were run and were passed by both version.
 
 	% TODO: consider removing this paragraph or at least the first two sentences
-	In addition to building libgmp using Minotaur we also build it using standard LLVM.
+	In addition to building libgmp using Minotaur we also built it using standard LLVM.
 	When comparing the results of running the benchmarks between standard LLVM and Minotaur we got the same inconclusive results as in our last report i.e. that Minotaur does not improve nor degrade the performance on average.
 	When comparing the results of running the benchmarks between regular Minotaur and our extended version there is almost no difference across all measured values.
 
@@ -413,7 +391,7 @@
 	% \includegraphics[width=\textwidth]{images/Figure_baseline_canon_gmp.png}
 	% \end{figure*}
 
-	\section{Discussion}
+	\subsection{Discussion}
 	% Key findings
 	% interpretation/explanation of the results
 
