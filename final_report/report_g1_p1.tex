@@ -71,17 +71,6 @@
  \usepackage{listings}
  \usepackage{enumitem}
 
- \usepackage[acronym]{glossaries}
- \makeglossaries 
- \newacronym{pgo}{PGO}{Profile Guided Optimization}
- \newacronym{ir}{IR}{Intermediate Representation}
- \newacronym{simd}{SIMD}{Single Instruction Multiple Data}
- \newacronym{mca}{MCA}{Machine Code Analyzer}
- \newacronym{smt}{SMT}{Satifiablility Module Theories}
- \newacronym{ssa}{SSA}{Static Single-Assignment}
-
-% TODO: remove all mentions of de-canonicalization and simply state that we do not require backwards transformation in the appropriate steps due to how minotaur and llvm work this should make the report shorter
-
  %-------------------------------------------------------------------------------
  \begin{document}
  	%-------------------------------------------------------------------------------
@@ -117,56 +106,54 @@
 	% What is the problem?
 	% Why is it important or interesting?
 	Minotaur \cite{liu24:minotaur} is a superoptimizer, that after computing optimizations, caches them in a database.
-	For this purpose, it uses original code segments as keys to find rewrites/optimizations, which are stored as values.
+	For this purpose, it uses the original code segment as a key to find a rewrite/optimization, which is stored as the value of the key value pair.
 	The intention behind the caching is to speedup the substantial runtimes of Minotaur for future compilations of the same or similar programs.
 	Minotaur's compile times, with a cold cache, can easily be hundreds of times slower than with regular LLVM \cite{liu24:minotaur}.
 	
 	% What is the state-of-the-art? What is the research-gap?
 	% Current state in Minotuar
-	Currently, Minotaur uses extracted LLVM IR code segments directly as cache keys, storing them alongside rewrites in Minotaur's own IR as values.
-	An example for a key-value pair is shown in figure \ref{fig:kv}.
+	Currently, Minotaur uses its extracted LLVM IR code segments directly as cache-keys, storing them alongside rewrites, in Minotaur's own IR, as values.
+	An example for a key-value pair is shown in Figure \ref{fig:canon_full}.
 
-	\input{kv_example.tex}
-
-	This approach can lead to cache misses because semantically equivalent code segments may have different signatures.
-	For example, if a cached segment has unused arguments while the current segment does not, the cache lookup fails and triggers a costly recomputation.
+	This approach can easily lead to avoidable cache misses because semantically equivalent code segments can have different keys.
+	For example, if a cached segment has unused arguments while the current segment does not, the cache lookup fails and triggers a costly optimization search by Minotaur's solver.
 	% To mitigate this we extended Minotaur \cite{liu24:minotaur} to support key canonicalization through multiple steps.
 
 	% Why is it difficult? What are the challenges?
 	To avoid this issue we attempt to increase the number of cache hits.
 	This leads to reduced compile times of Minotaur even when starting from a cold cache.
-	The main challenge is to maintain correctness of the cached optimizations.
+	With the main challenge being to maintain the correctness of the cached optimizations.
 
 	\section{Research Proposal}
 	% What is the proposed solution?
 	% How it works at a high-level?
 
-	To address the issue of near cache misses, our solution introduces an additional preprocessing step before a key is used for a cache lookup.
-	It performs multiple code transformations to map semantically equivalent code to a "canonical" representation.
+	To address the issue of avoidable cache misses, our solution introduces an additional preprocessing step before a key is used for a cache lookup.
+	It performs multiple code transformations to map semantically equivalent code to a "canonical" representation of the key.
 
 	% What are the key insights?
 	% What are novel aspects?
 	The idea is that this leads to fewer cache entries, an increased cache hit rate and fewer slow optimization searches by Minotaur.
-	For large enough projects this can already take effect during an initial build, even when starting with an empty cache and thereby reduce the compile time.
+	For large enough projects this can already take effect during an initial build, even when starting with an empty cache, thereby reduce the compile time.
 
 	\section{Canonicalization}
 	% TODO explain what is meant by equivalence or refer to a later text position
 	To motivate the idea of canonicalization we start by defining the set of all valid LLVM IR snippets and call it the key space.
-	The key space consists of equivalence classes of semantically equivalent keys.
+	The key space consists of equivalence classes of semantically equivalent keys, partitioning the key space.
 	We call a set that contains one representative of each equivalence class a canonical key space.
-	An ideal transformation would map each input LLVM IR snippet to its representative in a canonical key space.
-	Using such a transformation would enable reaching the optimal cache hit rate and avoid unnecessary expensive optimization searches by Minotaur, since there would be no cache misses anymore where an equivalent equivalent snippet has already been processed.
+	An ideal canonicalization transformation would map each input LLVM IR snippet to its representative in a canonical key space.
+	Using such a transformation would enable reaching the optimal cache hit rate and avoid unnecessary expensive optimization searches by Minotaur, since there would be no cache misses anymore where an equivalent snippet has already been processed.
 
 	% TODO: think about how hard this is i.e. np-hard or not even computable
 	Finding such a transformation is hard, therefore we attempted to only shrink the size of each equivalence class. % , resulting in a increased hit probability for each cache query.
-	For this relaxation to work, each equivalence class has to be finite.
+	For this relaxation to be useful, each equivalence class has to be finite after the transformation is applied.
 	This is because the probability that two randomly selected keys from the same equivalence class are identical depends on the size of that class.
 	Because Minotaur only generates slices up to a fixed depth, it is possible to achieve finite equivalence classes with a transformation normalizing the names in a code snippet.
 
 	% How did you design and implement the system?
 	Our extension is placed as a pre- and postprocessing step around Minotaur's inference step.
 	We intercept the LLVM IR produced by the slicer and perform transformations on it to produce a modified version of the input, which is then forwarded to the inference step.
-	In the following this set of transformations is called canonicalization.
+	In the following this set of transformations is also called canonicalization.
 	After the inference step is done and returns a rewrite in Minotaur's own IR, another set of transformations on the rewrite is performed.
 	This process is called de-canonicalization from now on.
 	Figure \ref{fig:architecture} gives an overview of how our extension integrates into Minotuar.	
@@ -178,17 +165,17 @@
 	More on that is discussed in section \ref{sec:ordering}.
 	During the canonicalization process every canonicalization function is applied iteratively in this predefined order.
 	% TODO: talk about why we need the reverse order
-	For de-canonicalization, the de-canonicalization functions are applied in the reverse order in which the canonicalization steps are specified.
-	It is also possible to pass information between the pairs of canonicalization and de-canonicalization functions of each step if required.
+	For de-canonicalization, the de-canonicalization functions are applied in the reverse order in which the canonicalization steps were applied.
+	It is also possible to pass information between the pairs of canonicalization and de-canonicalization functions of each step.
 	This enables the support for more complex transformations.
 
-	Due to the implementation of Minotaur and how we integrated our extension all the de-canonicalization could be done by updating meta data already required by minotaur during the canonicalization instead of relying on the explicit de-canonicalization.
+	Due to the implementation of Minotaur and how we integrated our extension, all the de-canonicalization is performed by updating meta data, already required by minotaur for substitution of the rewrite, instead of relying on the explicit de-canonicalization function.
 
 	Our modified Minotaur version is available on GitHub \footnote{\href{https://github.com/KiSchulz/minotaur}{Extended Minotaur Version}}.
 
 	\begin{figure*}[t]
 		\begin{center}
-			\caption{\label{fig:architecture} Structure of Minotaur and how the Canonicalization is integrated. The highlighted blocks were added for \mbox{(De-)Canonicalization.}}
+			\caption{\label{fig:architecture} Structure of Minotaur and how the (De-)Canonicalization is integrated. The highlighted blocks were added.}
 			\input{architecture.tex}
 		\end{center}
 	\end{figure*}
@@ -199,7 +186,7 @@
 	In the following each canonicalization-step is described.
 	They were selected such that each step maintains semantical equivalence, reduces the size of the key space and that it does not modify the code snippets depth.
 	Here two code snippets are considered equivalent if they compute the same value and have the same effects on memory, including ordering of changes during execution, when using the same arguments.
-	These three properties are shown for each step.
+	These three properties are shown for each canonicalization-step.
 	%The depth is kept constant as increasing this has a large impact on runtime as shown in original paper \cite{liu24:minotaur}.
 
 	% TODO: consider reducing the length of this paragraph by focusing only on why these properties where chosen and leave the rest for future work
@@ -208,16 +195,18 @@
 	Also, the depth constraint is not strictly required and could be dropped, but this would likely result in more complex  solver queries which could drastically impact the overall runtime of Minotaur and offset any benefit gained from using canonicalization.
 	This link between depth and runtime was already explored in the original paper \cite{liu24:minotaur}.
 	
-	An example of all the steps applied sequentially to an example input is shown in figure \ref{fig:canon_full}
+	An example of all the steps applied sequentially to an example input is shown in Figure \ref{fig:canon_full}
 
 	\input{all_steps_example.tex}
 
 	\paragraph{Eliminating Unused Function Arguments}
 	% explanation
 	Some of the functions extracted by Minotaur have unused arguments which can be removed during canonicalization.
+
 	% reduced key space
 	By removing those the number of functions with the same body but different signatures are reduced.
-	Thereby reducing the size of the key space.
+	Thereby decreasing the size of the key space.
+
 	% correctness
 	Let $f: T_1 \times ... \times T_n \to R$ be an extracted function where argument $t_i$ does not appear in the body of $f$.
 	We can then define $g: T_1 \times ... \times T_{i-1} \times T_{i+1} \times ... \times T_n \to R$ where
@@ -226,9 +215,11 @@
 	\]
 	This equality holds because $t_i$ does not affect the computation in $f$'s body.
 	Setting the canonicalization $f' := g$, we obtain the same result for all valid inputs.
+
 	% de-canonicalization
-	As shown in figure \ref{fig:kv} the rewrite does not have an explicit function signature.
+	As shown in Figure \ref{fig:canon_full} the rewrite does not have an explicit function signature.
 	Therefore no de-canonicalization is required.
+
 	% depth
 	Modifying the function signature has no impact on the depth of the given code snippet.
 
@@ -236,10 +227,11 @@
 	% explanation
 	Another modification that is done to the function signature is that the function arguments are sorted.
 	The arguments are sorted by their type-name and internally each set of arguments of the same type is sorted by when they are used inside the function body.
+
 	% reduced key space
 	This defines a total order of function arguments for each function body and reduces the size of the key space.
-	%correctness
 
+	%correctness
 	Let $f: T_1 \times ... \times T_n \to R$ be an input function and $f'$ the output function with reordered parameters according to permutation $\rho: [n] \to [n]$.
     Both functions accept the same set of arguments, just in different positions.
     For any input tuple $(t_1, ..., t_n)$, the function body computes the same result regardless of parameter order because the body operates on argument values, not their positional indices:
@@ -247,8 +239,10 @@
         f(t_1, ..., t_n) = f'(t_{\rho^{-1}(1)}, ..., t_{\rho^{-1}(n)}) = \text{body}(t_1, ..., t_n)
     \]
     Thus parameter reordering does not affect semantic equivalence.
+
 	% de-canonicalization
 	Because Minotaur maintains a mapping between the extracted functions arguments and the original code the snippet was extracted from, we can simply update this mapping and do not require explicit de-canonicalization.
+
 	% depth
 	Since only the function signature is modified there is no change to the depth.
 
@@ -256,8 +250,10 @@
 	% explanation
 	After the previous two transformations the signature is almost unique for each function body with the exception of the naming.
 	To resolve this each argument is renamed depending on its position in the signature.
+
 	% reduced key space
 	Because now the names of all function arguments are defined by their position all functions with a given signature and body map to the same key.
+
 	% correctness
 	Given a function $f(t_1, ..., t_n) := g(t_1, ..., t_n)$ as the input to the transformation step and a function $f'(x_1, ..., x_n) := g(x_1, ..., x_n)$ as the output.
 	If we apply $f$ and $f'$ to the same set of arguments $v_i, i \in [n]$ we get
@@ -265,9 +261,11 @@
 		f(v_1, ..., v_n) = g(v_1, ...,v_n) = f'(v_1, ..., v_n)
 	\]
 	This shows that renaming the arguments does not change the result of the function.
+
 	% de-canonicalization
 	As mentioned previously, Minotaur maintains a mapping between the arguments of the extracted function and the original code snippet from which it was derived.
-	This mapping does not rely on names but instead uses references to objects that possess names, eliminating the need for de-canonicalization.	
+	This mapping does not rely on names but instead uses references to objects that possess names, eliminating the need for de-canonicalization.
+	
 	% depth
 	Renaming does not impact the depth of the function.
 	
@@ -275,26 +273,33 @@
 	% explanation
 	Comparison operations often have multiple semantically equivalent ways of being expressed.
 	To address this every greater-than or greater-equal comparison is replaced with a less-than or less-equal comparison respectively and the operands are swapped.
+
 	% reduced key space
 	This reduces the size of the key space since now only less-than and less-equal comparisons are possible.
+
 	% correctness
 	The correctness of the transformation follows from the "lemma" below.
 	\begin{align*}
 		\forall x \forall y . (x\ P\ y \iff y\ P'\ x) \\
 		with (P, P') \in {(>, <), (\geq, \leq)}
 	\end{align*}
+
 	% de-canonicalization
 	For this transformation no de-canonicalization is needed.
+
 	% depth
 	The depth is not impacted, since only the predicate of a comparison operator is modified.
 
 	\paragraph{Non-strict Operator Replacement}
 	% explanation
 	This transformation replaces non-strict comparison operators with strict ones whenever possible, subject to certain constraints.
+
 	% depth
 	The replacement is applied only when the comparison involves constant operands, ensuring that the depth remains unchanged and that no additional operations are introduced.
+
 	% reduced key space
 	By reducing the number of distinct ways to express equivalent comparisons, this transformation shrinks the key space.
+
 	%correctness
 	Each value of LLVM's built-in integral and floating-point types represents a specific real number, with the exception of the special values $NaN$ and $\pm \inf$.
 	The real numbers form a total order; consequently, the set of all non-special values of each type also forms a total order.
@@ -311,6 +316,7 @@
 		\forall x . (x \leq c \iff x < c + \epsilon(c))
 	\]
 	Similar arguments apply for $\geq$ and for cases where the constant appears on the left-hand side of the comparison.
+
 	% de-canonicalization
 	No de-canonicalization is required for this transformation.
 
@@ -327,7 +333,7 @@
 	Second, the sorting of function arguments has to take place after the last modification to the function body in which the usage order of the arguments is changed.
 	This means concretely that it has to be run after the step replacing greater than with less than operators.
 
-	Based on those two constraints we can define the following order:
+	The following order fulfills these constraints:
 
 	\begin{enumerate}[noitemsep, topsep=0pt, leftmargin=*]
 		\item Elimination of unused Function Arguments
@@ -342,23 +348,22 @@
 	% Some of the debugging we did in the mean time.
 
 	\section{Evaluation}
-	\subsection{Setup}
+	% \subsection{Setup}
 	% TODO: fix this part based on what is in the final report
 	% hardware and general setup of the tests
 	For the evaluation we used an AMD Ryzen 9 5900 CPU which has 12 cores running at up to 4.8 GHz.
 	All benchmarks were built using the $-O3$ and $-march=native$ flags.
-	The authors of Minotaur updated their code since our original attempt to reproduce their results.
 	% TODO remove the foot note to save space
 	We based our evaluation on the latest version of Minotaur \footnote{\href{https://github.com/minotaur-toolkit/minotaur/tree/d372e6dd903045fcb0461a74633634470f6b157c}{Updated Minotaur Version}} that did not include any new features but all the available bug fixes.
 
 	% what was done for each benchmark run
-	Each benchmarked program was built once using Minotaur with canonicalization disabled and once with canonicalization enabled.
+	The benchmark was built once using Minotaur with canonicalization module disabled and once with canonicalization module enabled.
 	Since our canonicalization steps are compositional we measured the effect each step and combination of steps have.
-	Furthermore, we ran the provided tests and benchmarked each compiled program.
+	Furthermore, we ran the provided test and benchmark suite.
 
 	% what was benchmarked and why
 	We chose to benchmark libgmp-6.2.1 as the original paper did \cite{liu24:minotaur}.
-	Due to the long compile times experienced on libYUV, we decided against benchmarking it, like the original paper did, and instead opted to select different smaller projects.
+	Due to generally long compile times of Minotaur, we decided against benchmarking additional code like libYUV, like the original paper did. %, and instead opted to select different smaller projects.
 	% TODO: mention the other projects that were benchmarked
 
 	\subsection{Results}
@@ -366,19 +371,19 @@
 	% just the results no interpretation
 
 	Building libgmp using our augmented version of Minotaur showed a speedup of 1.31x compared to regular Minotaur.
-	This can also be seen in the bottom graph of figure \ref{fig:cache} which is why the orange plots stop earlier.
-	In this graph it can also be seen that the respective curves have a similar shape but are shifted on the time axis.
+	This can also be seen in the bottom graph of Figure \ref{fig:cache}, which is why the orange plots stop earlier.
+	In this graph it can also be seen that the respective curves have a similar shapes, but are shifted on the time axis.
 	Overall, our canonicalizations only added 5.68 seconds of total CPU time for the build of libgmp.
 
-	The overall cache size using our augmented version was only 78.3\% of the cache size of regular Minotaur which was 17734 key value pairs.
-	When looking at figure \ref{fig:cache} it can be seen that the overall number of queries was quite similar.
-	In comparison, the number of cache hits for our augmented version was 12.7\% higher and lead to 67.7\% cache hit rate, while regular Minotaur only achieved 59.2\%.
+	The overall cache size using our augmented version was only 78.3\% of the cache size of regular Minotaur, with 17734 key value pairs.
+	When looking at Figure \ref{fig:cache} it can be seen that the overall number of queries was very similar between the two versions.
+	On the other hand, the number of cache hits for our augmented version was 12.7\% greater, giving a overall cache hit rate of  67.7\%, while regular Minotaur only achieved 59.2\%.
 	This is also reflected in the 28.6\% higher number of solver invocations by regular Minotaur.
-	When it takes to long to find a beneficial rewrite it times out.
-	Our extended version shows a slightly lower number of timeouts relative to the total number of solver invocations of 25.1\% compared to 27.2\% compared to regular Minotaur.
-	When looking at queries that were a cache hit where the cached key also has a solution associated with it, which is denoted as $sol$ in figure \ref{fig:cache}, we can see that this increased by 50\% for our solution.
+	In cases where the solver takes to long to find a beneficial rewrite, it times out.
+	Our extended version shows a slightly lower timeout rate, relative to the total number of solver invocations, of 25.1\% compared to 27.2\% compared to regular Minotaur.
+	When looking at cache hits where the cached key also has a solution associated with it, this case is denoted as $sol$ in Figure \ref{fig:cache}, we can see that this increased by 50\% for our approach.
 	% TODO: consider using % time faster not speedup doe to the sentence structure
-	Importantly, similar improvements were also measured in the total CPU time it took to build libgmp, where a speedup of 1.37x was observed.
+	Similar improvements, as the once observed to overall speedup , were also measured in the total CPU time it took to build libgmp, where a speedup of 1.37x was measured.
 	
 	\begin{figure*}
 	\centering
@@ -390,12 +395,12 @@
 	\end{figure*}
 	
 	As mentioned earlier we used a updated version of Minotaur including new bug fixes.
-	The tests included by libgmp were run and  passed for both regular Minotaur and our extended version.
+	The tests included by libgmp were run and  passed both for regular Minotaur and for our extended version.
 
 	% TODO: consider removing this paragraph or at least the first two sentences
-	In addition to building libgmp using Minotaur we also build it using standard llvm.
-	When comparing the results from running the benchmark between standard LLVM and Minotaur we got the same inconclusive results as in our last report i.e. that Minotaur does not improve nor degrade the performance.
-	When comparing the results from running the benchmark between regular Minotaur and our extended version there is almost no difference across all measured values.
+	In addition to building libgmp using Minotaur we also build it using standard LLVM.
+	When comparing the results of running the benchmarks between standard LLVM and Minotaur we got the same inconclusive results as in our last report i.e. that Minotaur does not improve nor degrade the performance on average.
+	When comparing the results of running the benchmarks between regular Minotaur and our extended version there is almost no difference across all measured values.
 
 	% \begin{figure*}
 	% \centering
@@ -412,18 +417,27 @@
 	% Key findings
 	% interpretation/explanation of the results
 
-	The speedup measured by our extension is caused by the increase in the cache hit rate which leads to fewer long running solver invocations, fulfilling the main goal of our proposed solution.
+	The speedup measured by our extension is caused by the increase in the cache hit rate which leads to fewer long running solver invocations, which was the main goal of our proposed solution.
 	This was achieved even though only very simple transformations were applied.
+	Additional, potentially more complex transformations could lead to even more gains.
 
-	The different number of queries, which can be observed in figure \ref{fig:cache}, are also present between two runs of regular Minotaur.
+	The differing numbers of queries, which can be observed in Figure \ref{fig:cache}, are also present between two runs of regular Minotaur.
+	This shows that this inconsistent behavior is not caused by the addition of our module.
 	It is not clear if this is caused by LLVM producing different LLVM IR between runs or if it is caused by Minotaur.
 
-	That the tests of libgmp pass indicates, that our canonicalization step maintains the sematics of the keys, therefore being correct.
+
+	The passing libgmp tests indicate that our canonicalization preserves the semantics of the keys, suggesting that the implementation is correct.
 
 	\section{Conclusion}
 	% did it work, what issues are remaining, future work
 
-	To further improve our approach, one could attempt to perform a more structured search for additional transformations by finding syntactically equivalent rewrites in the cache and looking at their respective keys to come up with new transformations.
+	Overall, it can be said that canonicalization was able to increase the cache hit rate for Minotaur and to thereby lower the number of long running solver invocations.
+	This directly lead to a speedup of 1.31x when compiling libgmp.
+	Due to time constraints only libgmp was build, because building of libgmp took, using both the regular Minotaur version and our extended version, around 86 hours.
+	Further benchmarks could be interesting to gain a more representative picture of the effectiveness of canonicalization.
+
+	To improve our approach, one could attempt to perform a more structured search for additional transformations.
+	One way of doing this could be finding syntactically equivalent rewrites in the cache and comparing their respective keys, to derive new transformations.
 	% perform load ordering so between loads and also where to load data in a function e.g. at the beginning or end
 	%
 	% other ideas of making minotaur faster are pgo and to not start with the very short slices as minotaur does 1 ... depth limit in the slicer

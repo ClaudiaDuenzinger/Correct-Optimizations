@@ -1,58 +1,64 @@
-		\begin{figure*}[t]
-		\centering
-		\caption{\label{fig:canon_full} Example applying each canonicalization step.}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		input:
-			define i1 @cut(i32 %a, float %b, i32 %c, float %d) {
-				%1 = fcmp uge float %b, %d
-				%2 = icmp sle i32 %c, 15
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		unused argument elimination:	
-			define i1 @cut !\colorbox{blue!50}{(float \%b, i32 \%c, float \%d)}! {
-				%1 = fcmp uge float %b, %d
-				%2 = icmp sle i32 %c, 15
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		replacing greater-than with less-than:	
-			define i1 @cut(float %b, i32 %c, float %d) {
-				%1 = fcmp !\colorbox{blue!50}{ule}! float %d, %b
-				%2 = icmp sle i32 %c, 15
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		replacing non-strict operators:	
-			define i1 @cut(float %b, i32 %c, float %d) {
-				%1 = fcmp ule float %d, %b
-				%2 = icmp !\colorbox{blue!50}{slt}! i32 %c, 16
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		sorting arguments:
-			define i1 @cut!\colorbox{blue!50}{(float \%d, float \%b, i32 \%c)}! {
-				%1 = fcmp ule float %d, %b
-				%2 = icmp slt i32 %c, 16
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-		\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\small\tt]
-		renaming argument:	
-			define i1 @cut !\colorbox{blue!50}{(float \%\_\_canonArg, float \%\_\_canonArg1, i32 \%\_\_canonArg2)}! {
-				%1 = fcmp ule float %__canonArg, %__canonArg1
-				%2 = icmp slt i32 %__canonArg2, 16
-				%3 = and i1 %1, %2
-				ret i1 %3
-			}
-		\end{lstlisting}
-	 	\end{figure*}
+\begin{figure*}[t]
+\centering
+\caption{\label{fig:canon_full} Example applying canonicalization steps (changes highlighted).}
+\begin{minipage}[t]{\columnwidth}
+\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\footnotesize\tt, columns=flexible]
+input/key:
+define i1 @cut(i32 %a, float %b, i32 %c,
+		float %d) {
+	%1 = fcmp uge float %b, %d
+	%2 = icmp sle i32 %c, 15
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+1. unused argument elimination:	
+define i1 @cut !\colorbox{blue!50}{(float \%b, i32 \%c, float \%d)}! {
+	%1 = fcmp uge float %b, %d
+	%2 = icmp sle i32 %c, 15
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+2. replacing greater-than with less-than:	
+define i1 @cut(float %b, i32 %c, float %d) {
+	%1 = fcmp !\colorbox{blue!50}{ule}! float %d, %b
+	%2 = icmp sle i32 %c, 15
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[t]{\columnwidth}
+\begin{lstlisting}[language=llvm, escapechar=!, basicstyle=\footnotesize\tt, columns=flexible]
+3. replacing non-strict operators:	
+define i1 @cut(float %b, i32 %c, float %d) {
+	%1 = fcmp ule float %d, %b
+	%2 = icmp !\colorbox{blue!50}{slt}! i32 %c, 16
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+4. sorting arguments:
+define i1 @cut!\colorbox{blue!50}{(float \%d, float \%b, i32 \%c)}! {
+	%1 = fcmp ule float %d, %b
+	%2 = icmp slt i32 %c, 16
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+5. renaming argument:	
+define i1 @cut !\colorbox{blue!50}{(float \%\_\_canonArg, float \%\_\_canonArg1,}!
+		 !\colorbox{blue!50}{i32 \%\_\_canonArg2)}! {
+	%1 = fcmp ule float %__canonArg, %__canonArg1
+	%2 = icmp slt i32 %__canonArg2, 16
+	%3 = and i1 %1, %2
+	%4 = and i1 %3, 0
+	ret i1 %4
+}
+output/value:
+(reservedconst i1 |i1 false|)
+\end{lstlisting}
+\end{minipage}
+\end{figure*}

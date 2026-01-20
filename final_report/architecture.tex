@@ -18,11 +18,11 @@
 \node (backend)  at (12, 0)  {Machine code\\generation};
 
 % Minotaur internals
-\node (slicer)     at (2, -3) {Cut extraction\\(Slicer)};
-\node [fill=blue!50] (canon)      at (2, -5) {Canonicalization\\(Canonicalizer)};
-\node [fill=blue!50] (deCanon)    at (8, -3) {De-Canonicalization\\(Canonicalizer)};
-\node (cache)      at (5, -5) {Cache};
-\node (computeOpt) at (11, -5) {Compute\\Optimization};
+\node (slicer)     at (2, -2) {Cut extraction\\(Slicer)};
+\node [fill=blue!50] (canon)      at (2, -4) {Canonicalization\\(Canonicalizer)};
+\node [fill=blue!50] (deCanon)    at (9, -2) {De-Canonicalization\\(Canonicalizer)};
+\node (cache)      at (5, -4) {Cache};
+\node (computeOpt) at (11, -4) {Compute\\Optimization};
 
 \end{scope}
 
@@ -62,7 +62,7 @@
   rounded corners,
   fit=(frontend)(opt1)(minotaur)(opt2)(backend),
   label=above:{LLVM Compilation Pipeline},
-  inner sep=6mm
+  inner sep=2mm
 ] {};
 
 \node[
@@ -71,7 +71,7 @@
   rounded corners,
   fit=(slicer)(canon)(cache)(computeOpt)(deCanon),
   label=above:{Minotaur},
-  inner sep=6mm
+  inner sep=2mm
 ] {};
 
 \node[
@@ -80,7 +80,7 @@
   rounded corners,
   fit=(cache)(computeOpt),
   label=above:{Inference},
-  inner sep=2mm
+  inner sep=1mm
 ] {};
 
 
