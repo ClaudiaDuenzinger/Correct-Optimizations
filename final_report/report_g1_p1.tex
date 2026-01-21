@@ -156,7 +156,7 @@
 	In the following this set of transformations is also called canonicalization.
 	After the inference step is done and returns a rewrite in Minotaur's own IR, another set of transformations on the rewrite is performed.
 	This process is called de-canonicalization from now on.
-	Figure \ref{fig:architecture} gives an overview of how our extension integrates into Minotuar.	
+	Figure \ref{fig:architecture} gives an overview of how our extension integrates into Minotaur.	
 
 	% TODO add a figure ilustrating our canonicalization steps to support this paragraph
 	These transformation steps are always defined as a pair which we call a canonicalization-step.
@@ -195,7 +195,7 @@
 	Also, the depth constraint is not strictly required and could be dropped, but this would likely result in more complex  solver queries which could drastically impact the overall runtime of Minotaur and offset any benefit gained from using canonicalization.
 	This link between depth and runtime was already explored in the original paper \cite{liu24:minotaur}.
 	
-	An example of all the steps applied sequentially to an example input is shown in Figure \ref{fig:canon_full}
+	An example of all the steps applied sequentially to an example input is shown in Figure \ref{fig:canon_full}.
 
 	\input{all_steps_example.tex}
 
@@ -292,7 +292,7 @@
 	In a total order, every value except for the minimum and maximum has both an immediate predecessor and an immediate successor.
 	The minimum only has a successor, and the maximum only has a predecessor.
 	Due to this property, non-strict comparison operators can be replaced by strict ones by appropriately adjusting a constant operand, provided that a suitable neighboring value exists.
-	For example, given an expression of the form $x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $x < c + \epsilon(c)$ where $\epsilon(c)$ is the smallest representable increment at $c$ (e.g., $1$ for integers).
+	For example, given an expression of the form $x \leq c$ where $x$ is a variable and $c$ is a constant, the expression can be transformed into $x < c + \epsilon(c)$ where $\epsilon(c)$ is the smallest representable increment at $c$ (e.g. $1$ for integers).
 	Formally:
 	\[
 		\forall x . (x \leq c \iff x < c + \epsilon(c))
@@ -357,11 +357,11 @@
 	When looking at Figure \ref{fig:cache} it can be seen that the overall number of queries was very similar between the two versions.
 	On the other hand, the number of cache hits for our augmented version was 12.7\% greater, giving a overall cache hit rate of  67.7\%, while regular Minotaur only achieved 59.2\%.
 	This is also reflected in the 28.6\% higher number of solver invocations by regular Minotaur.
-	In cases where the solver takes to long to find a beneficial rewrite, it times out.
+	In cases where the solver takes too long to find a beneficial rewrite, it times out.
 	Our extended version shows a slightly lower timeout rate, relative to the total number of solver invocations, of 25.1\% compared to 27.2\% compared to regular Minotaur.
 	When looking at cache hits where the cached key also has a solution associated with it, this case is denoted as $sol$ in Figure \ref{fig:cache}, we can see that this increased by 50\% for our approach.
 	% TODO: consider using % time faster not speedup doe to the sentence structure
-	Similar improvements, as the once observed to overall speedup , were also measured in the total CPU time it took to build libgmp, where a speedup of 1.37x was measured.
+	Similar improvements, as the one observed to overall speedup , were also measured in the total CPU time it took to build libgmp, where a speedup of 1.37x was measured.
 	
 	\begin{figure*}
 	\centering
@@ -373,7 +373,7 @@
 	\end{figure*}
 	
 	As mentioned earlier we used an updated version of Minotaur including new bug fixes.
-	The tests included by libgmp were run and were passed by both version.
+	The tests included by libgmp were run and were passed by both versions.
 
 	% TODO: consider removing this paragraph or at least the first two sentences
 	In addition to building libgmp using Minotaur we also built it using standard LLVM.
@@ -411,7 +411,7 @@
 
 	Overall, it can be said that canonicalization was able to increase the cache hit rate for Minotaur and to thereby lower the number of long running solver invocations.
 	This directly lead to a speedup of 1.31x when compiling libgmp.
-	Due to time constraints only libgmp was build, because building of libgmp took, using both the regular Minotaur version and our extended version, around 86 hours.
+	Due to time constraints only libgmp was built, because building of libgmp took, using both the regular Minotaur version and our extended version, around 86 hours.
 	Further benchmarks could be interesting to gain a more representative picture of the effectiveness of canonicalization.
 
 	To improve our approach, one could attempt to perform a more structured search for additional transformations.
