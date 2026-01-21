@@ -347,11 +347,10 @@
 	\subsection{Results}
 	% Evaluation results
 	% just the results no interpretation
-
-	Building libgmp using our augmented version of Minotaur showed a speedup of 1.31x compared to regular Minotaur.
+	Building libgmp using our augmented version of Minotaur achieved a 1.31× speedup over regular Minotaur, reducing wall-clock build time from 48.6 hours to 36.9 hours.
 	This can be seen in the bottom graph of Figure \ref{fig:cache}, which is why the orange plots stop earlier.
 	In this graph it can also be seen that the respective curves have a similar shapes, but are shifted on the time axis.
-	Overall, our canonicalizations only added 5.68 seconds of total CPU time for the build of libgmp.
+	In total, our canonicalizations incurred just 5.68 seconds of aggregate CPU time across all cores, while reducing libgmp's wall-clock build time by approximately 11.8 hours.
 
 	The overall cache size using our augmented version was only 78.3\% of the cache size of regular Minotaur, with 17734 key value pairs.
 	When looking at Figure \ref{fig:cache} it can be seen that the overall number of queries was very similar between the two versions.
